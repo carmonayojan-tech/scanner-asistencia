@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escáner QR – Asistencia</title>
+
+  <!--
+  ════════════════════════════════════════════════════════
+   PASO OBLIGATORIO: Reemplaza TU_URL_AQUI con la URL
+   de tu Web App de Google Apps Script
+  ════════════════════════════════════════════════════════
+  -->
+  <script>
+    const APP_URL = 'https://script.google.com/macros/s/AKfycbwiN2CZRHF77v6exCmn-oyUDaHknzuazsPCO5AD48I5rE4JfogaElEV_HRzHIWO8z84aA/exec';
+    // Ejemplo: 'https://script.google.com/macros/s/AKfy.../exec'
+  </script>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 16px 48px rgba(0,0,0,.28);
+      padding: 22px 18px;
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+    }
+    .logo { font-size: 32px; margin-bottom: 4px; }
+    h1 { font-size: 20px; color: #0f172a; margin-bottom: 4px; }
+    .sub { font-size: 12px; color: #64748b; margin-bottom: 14px; line-height: 1.5; }
+
+    .estado-wrap { display: flex; gap: 8px; margin-bottom: 14px; }
+    .estado-btn {
+      flex: 1; padding: 10px;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      background: #f8fafc;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: .18s;
+      color: #334155;
+    }
+    .estado-btn.active { border-color: #2196F3; background: #2196F3; color: #fff; }
+
+    #qr-reader {
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      background: #000;
+      min-height: 240px;
+      position: relative;
+    }
+    #qr-reader__dashboard,
+    #qr-reader__header_message,
+    #qr-reader__status_span { display: none !important; }
+    #qr-reader video { border-radius: 12px; width: 100% !important; }
+
+    #marco-guia {
+      display: none;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 190px; height: 190px;
+      border: 3px solid #22c55e;
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,.38);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #resultado {
+      display: none;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px; font-weight: 600;
+      margin-bottom: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      text-align: left;
+    }
+    .ok   { background: #dcfce7; color: #166534; border: 1.5px solid #86efac; }
+    .warn { background: #fef3c7; color: #92400e; border: 1.5px solid #fcd34d; }
+    .err  { background: #fee2e2; color: #b91c1c; border: 1.5px solid #fca5a5; }
+
+    .btn-cerrar {
+      width: 100%; padding: 13px;
+      border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; color: #fff;
+      background: #ef4444; transition: .18s;
+    }
+    .btn-cerrar:hover { background: #dc2626; }
+
+    #loading {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 10px;
+      padding: 32px 0; color: #64748b; font-size: 14px;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 4px solid #e2e8f0;
+      border-top-color: #2196F3;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes flash { 0%{opacity:1} 50%{opacity:.2} 100%{opacity:1} }
+    .detectado { animation: flash .25s ease; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">📷</div>
+  <h1>Escáner QR</h1>
+  <p class="sub">Apunta la cámara al código QR del estudiante</p>
+
+  <div class="estado-wrap">
+    <button class="estado-btn active" id="btn-ingreso" onclick="setEstado('INGRESO')">INGRESO</button>
+    <button class="estado-btn"        id="btn-salida"  onclick="setEstado('SALIDA')">SALIDA</button>
+  </div>
+
+  <div id="qr-reader" style="position:relative">
+    <div id="loading">
+      <div class="spinner"></div>
+      <span>Iniciando cámara...</span>
+    </div>
+    <div id="marco-guia"></div>
+  </div>
+
+  <div id="resultado"></div>
+  <button class="btn-cerrar" onclick="cerrar()">Cerrar escáner</button>
+</div>
+
+<script>
+  /* ── Validar que se configuró la URL ── */
+  if (!APP_URL || APP_URL === 'TU_URL_AQUI' || APP_URL.includes('TU_URL')) {
+    window.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('loading').innerHTML =
+        '<p style="color:#b91c1c;font-size:13px;padding:16px;line-height:1.8;text-align:left">' +
+        '⚠️ <strong>URL no configurada</strong><br><br>' +
+        'Abre <code>scanner.html</code> con el Bloc de notas,<br>' +
+        'busca la línea:<br>' +
+        '<code style="background:#f1f5f9;padding:2px 6px;border-radius:4px">const APP_URL = \'TU_URL_AQUI\';</code><br><br>' +
+        'y reemplaza <strong>TU_URL_AQUI</strong> con la URL<br>de tu Web App de Google Apps Script.' +
+        '</p>';
+    });
+  }
+
+  let estadoActual = 'INGRESO';
+  let procesando   = false;
+  let scanner      = null;
+
+  function setEstado(e) {
+    estadoActual = e;
+    document.getElementById('btn-ingreso').classList.toggle('active', e === 'INGRESO');
+    document.getElementById('btn-salida').classList.toggle('active',  e === 'SALIDA');
+  }
+
+  function mostrar(msg, tipo, autoOcultar) {
+    const r = document.getElementById('resultado');
+    r.textContent   = msg;
+    r.className     = tipo;
+    r.style.display = 'block';
+    if (autoOcultar) setTimeout(() => { r.style.display = 'none'; procesando = false; }, autoOcultar);
+  }
+
+  function registrar(id) {
+    if (procesando) return;
+    procesando = true;
+
+    /* Flash visual al detectar QR */
+    const reader = document.getElementById('qr-reader');
+    reader.classList.add('detectado');
+    setTimeout(() => reader.classList.remove('detectado'), 250);
+
+    mostrar('⏳ Leyendo: ' + id, 'warn', 0);
+
+    const cbName = 'cb_' + Date.now();
+    const tag    = document.createElement('script');
+    let   timer;
+
+    window[cbName] = function(data) {
+      clearTimeout(timer);
+      tag.remove();
+      delete window[cbName];
+      if (data.exito) {
+        mostrar('✅ ' + data.estado + ': ' + data.nombre + '\n🕐 ' + data.hora, 'ok', 4000);
+      } else {
+        mostrar('⚠️ ' + data.mensaje, 'warn', 4000);
+      }
+    };
+
+    timer = setTimeout(function() {
+      tag.remove();
+      delete window[cbName];
+      mostrar(
+        '❌ Sin respuesta del servidor.\n\n' +
+        'Verifica:\n• La URL del Web App es correcta\n• La app está publicada ("Cualquier persona")',
+        'err', 6000
+      );
+    }, 12000);
+
+    tag.src = APP_URL
+      + '?page=registrar_jsonp'
+      + '&callback=' + cbName
+      + '&id='       + encodeURIComponent(id)
+      + '&estado='   + encodeURIComponent(estadoActual);
+
+    document.head.appendChild(tag);
+  }
+
+  function iniciarScanner() {
+    scanner = new Html5Qrcode('qr-reader');
+
+    /* qrbox adaptativo: 58% del ancho disponible */
+    const dim = Math.round(Math.min(window.innerWidth - 80, 380) * 0.58);
+    const cfg = {
+      fps: 15,
+      qrbox: { width: dim, height: dim },
+      aspectRatio: 1.0,
+      disableFlip: false
+    };
+
+    const onDecode = (decoded) => registrar(decoded.trim());
+    const onError  = () => {};
+
+    const arrancado = () => {
+      document.getElementById('loading').style.display    = 'none';
+      document.getElementById('marco-guia').style.display = 'block';
+    };
+
+    const mostrarErrorCamara = (err) => {
+      document.getElementById('loading').innerHTML =
+        '<p style="color:#b91c1c;font-size:13px;padding:16px;line-height:1.8;text-align:left">' +
+        '❌ <strong>Sin acceso a la cámara</strong><br><br>' +
+        '1. Haz clic en el ícono 🔒 junto a la URL<br>' +
+        '2. Cambia "Cámara" → <strong>Permitir</strong><br>' +
+        '3. Recarga la página (F5)<br><br>' +
+        '<small style="color:#94a3b8">' + err + '</small>' +
+        '</p>';
+    };
+
+    /* Intentar cámara trasera primero (móvil), luego frontal (laptop) */
+    scanner.start({ facingMode: 'environment' }, cfg, onDecode, onError)
+      .then(arrancado)
+      .catch(() => {
+        scanner.start({ facingMode: 'user' }, cfg, onDecode, onError)
+          .then(arrancado)
+          .catch(mostrarErrorCamara);
+      });
+  }
+
+  function cerrar() {
+    if (scanner) {
+      scanner.stop().catch(() => {}).finally(() => window.close());
+    } else {
+      window.close();
+    }
+  }
+
+  window.addEventListener('load', iniciarScanner);
+</script>
+</body>
+</html>
