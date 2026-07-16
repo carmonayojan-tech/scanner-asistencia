@@ -13,124 +13,73 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
+      min-height: 100vh; display: flex;
+      align-items: center; justify-content: center; padding: 16px;
     }
     .card {
-      background: #fff;
-      border-radius: 20px;
+      background: #fff; border-radius: 20px;
       box-shadow: 0 16px 48px rgba(0,0,0,.28);
-      padding: 22px 18px;
-      width: 100%;
-      max-width: 420px;
-      text-align: center;
+      padding: 22px 18px; width: 100%; max-width: 420px; text-align: center;
     }
     .logo { font-size: 32px; margin-bottom: 4px; }
     h1 { font-size: 20px; color: #0f172a; margin-bottom: 4px; }
     .sub { font-size: 12px; color: #64748b; margin-bottom: 14px; line-height: 1.5; }
-
     .estado-wrap { display: flex; gap: 8px; margin-bottom: 10px; }
     .estado-btn {
-      flex: 1; padding: 10px;
-      border: 2px solid #e2e8f0;
-      border-radius: 10px;
-      background: #f8fafc;
-      font-size: 14px; font-weight: 700;
-      cursor: pointer; transition: .18s;
-      color: #334155;
+      flex: 1; padding: 10px; border: 2px solid #e2e8f0;
+      border-radius: 10px; background: #f8fafc;
+      font-size: 14px; font-weight: 700; cursor: pointer; transition: .18s; color: #334155;
     }
     .estado-btn.active { border-color: #2196F3; background: #2196F3; color: #fff; }
-
-    .camara-wrap {
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: 10px;
-    }
+    .camara-wrap { display: flex; justify-content: flex-end; margin-bottom: 10px; }
     .btn-camara {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
-      border: 2px solid #e2e8f0;
-      border-radius: 10px;
-      background: #f8fafc;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      color: #334155;
-      transition: .18s;
-      user-select: none;
+      display: flex; align-items: center; gap: 6px; padding: 7px 14px;
+      border: 2px solid #e2e8f0; border-radius: 10px; background: #f8fafc;
+      font-size: 13px; font-weight: 600; cursor: pointer; color: #334155;
+      transition: .18s; user-select: none;
     }
     .btn-camara:hover  { background: #e2e8f0; }
     .btn-camara:active { transform: scale(.96); }
     .btn-camara.disabled { opacity: .4; pointer-events: none; }
     .btn-camara svg { width: 18px; height: 18px; flex-shrink: 0; }
-
     #qr-reader {
-      width: 100%;
-      border-radius: 12px;
-      overflow: hidden;
-      margin-bottom: 12px;
-      background: #000;
-      min-height: 240px;
-      position: relative;
+      width: 100%; border-radius: 12px; overflow: hidden;
+      margin-bottom: 12px; background: #000; min-height: 240px; position: relative;
     }
-    #qr-reader__dashboard,
-    #qr-reader__header_message,
+    #qr-reader__dashboard, #qr-reader__header_message,
     #qr-reader__status_span { display: none !important; }
     #qr-reader video { border-radius: 12px; width: 100% !important; }
-
     #marco-guia {
-      display: none;
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: 190px; height: 190px;
-      border: 3px solid #22c55e;
-      border-radius: 12px;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,.38);
-      pointer-events: none;
-      z-index: 10;
+      display: none; position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%); width: 190px; height: 190px;
+      border: 3px solid #22c55e; border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,.38); pointer-events: none; z-index: 10;
     }
     #resultado {
-      display: none;
-      border-radius: 10px;
-      padding: 12px 14px;
-      font-size: 14px; font-weight: 600;
-      margin-bottom: 12px;
-      line-height: 1.6;
-      white-space: pre-wrap;
-      text-align: left;
+      display: none; border-radius: 10px; padding: 12px 14px;
+      font-size: 14px; font-weight: 600; margin-bottom: 12px;
+      line-height: 1.6; white-space: pre-wrap; text-align: left;
     }
     .ok   { background: #dcfce7; color: #166534; border: 1.5px solid #86efac; }
     .warn { background: #fef3c7; color: #92400e; border: 1.5px solid #fcd34d; }
     .err  { background: #fee2e2; color: #b91c1c; border: 1.5px solid #fca5a5; }
-
     .btn-cerrar {
-      width: 100%; padding: 13px;
-      border: none; border-radius: 12px;
-      font-size: 15px; font-weight: 700;
-      cursor: pointer; color: #fff;
+      width: 100%; padding: 13px; border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 700; cursor: pointer; color: #fff;
       background: #ef4444; transition: .18s;
     }
     .btn-cerrar:hover { background: #dc2626; }
-
     #loading {
       display: flex; flex-direction: column;
       align-items: center; gap: 10px;
       padding: 32px 0; color: #64748b; font-size: 14px;
     }
     .spinner {
-      width: 36px; height: 36px;
-      border: 4px solid #e2e8f0;
-      border-top-color: #2196F3;
-      border-radius: 50%;
+      width: 36px; height: 36px; border: 4px solid #e2e8f0;
+      border-top-color: #2196F3; border-radius: 50%;
       animation: spin .8s linear infinite;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes spin  { to { transform: rotate(360deg); } }
     @keyframes flash { 0%{opacity:1} 50%{opacity:.2} 100%{opacity:1} }
     .detectado { animation: flash .25s ease; }
   </style>
@@ -146,14 +95,16 @@
     <button class="estado-btn"        id="btn-salida"  onclick="setEstado('SALIDA')">SALIDA</button>
   </div>
 
+  <!-- Botón cambio de cámara: oculto hasta confirmar que hay más de 1 -->
   <div class="camara-wrap">
-    <button class="btn-camara disabled" id="btn-cambiar-camara" onclick="cambiarCamara()">
+    <button class="btn-camara disabled" id="btn-cambiar-camara"
+            onclick="cambiarCamara()" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round">
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
         <circle cx="12" cy="13" r="4"/>
       </svg>
-      <span id="txt-camara">Detectando cámaras...</span>
+      <span id="txt-camara">Cámara delantera</span>
     </button>
   </div>
 
@@ -170,30 +121,25 @@
 </div>
 
 <script>
-  /* ── Estado global ── */
-  let estadoActual  = 'INGRESO';
-  let procesando    = false;
-  let scanner       = null;
-  let camaras       = [];   // [{id, label}]
-  let idxActual     = 0;    // índice en el array camaras
+  let estadoActual = 'INGRESO';
+  let procesando   = false;
+  let scanner      = null;
+  let camaras      = [];
+  let idxActual    = 0;
+  let cambiando    = false;
 
-  /* ── Ingreso / Salida ── */
   function setEstado(e) {
     estadoActual = e;
     document.getElementById('btn-ingreso').classList.toggle('active', e === 'INGRESO');
     document.getElementById('btn-salida').classList.toggle('active',  e === 'SALIDA');
   }
 
-  /* ── Resultado visual ── */
   function mostrar(msg, tipo, ms) {
     const r = document.getElementById('resultado');
-    r.textContent   = msg;
-    r.className     = tipo;
-    r.style.display = 'block';
+    r.textContent = msg; r.className = tipo; r.style.display = 'block';
     if (ms) setTimeout(() => { r.style.display = 'none'; procesando = false; }, ms);
   }
 
-  /* ── Registrar asistencia vía JSONP ── */
   function registrar(id) {
     if (procesando) return;
     procesando = true;
@@ -203,51 +149,43 @@
     mostrar('⏳ Leyendo: ' + id, 'warn', 0);
 
     const cbName = 'cb_' + Date.now();
-    const tag    = document.createElement('script');
-    let   timer;
-
+    const tag = document.createElement('script');
+    let timer;
     window[cbName] = function(data) {
       clearTimeout(timer); tag.remove(); delete window[cbName];
       if (data.exito) mostrar('✅ ' + data.estado + ': ' + data.nombre + '\n🕐 ' + data.hora, 'ok', 4000);
       else            mostrar('⚠️ ' + data.mensaje, 'warn', 4000);
     };
-
     timer = setTimeout(function() {
       tag.remove(); delete window[cbName];
       mostrar('❌ Sin respuesta del servidor.\n\nVerifica:\n• URL del Web App correcta\n• App publicada ("Cualquier persona")', 'err', 6000);
     }, 12000);
-
-    tag.src = APP_URL
-      + '?page=registrar_jsonp&callback=' + cbName
-      + '&id='     + encodeURIComponent(id)
-      + '&estado=' + encodeURIComponent(estadoActual);
+    tag.src = APP_URL + '?page=registrar_jsonp&callback=' + cbName
+      + '&id=' + encodeURIComponent(id) + '&estado=' + encodeURIComponent(estadoActual);
     document.head.appendChild(tag);
   }
 
-  /* ── Configuración del escáner ── */
   function getCfg() {
     const dim = Math.round(Math.min(window.innerWidth - 80, 380) * 0.58);
     return { fps: 12, qrbox: { width: dim, height: dim }, aspectRatio: 1.0, disableFlip: false };
   }
 
-  /* ── Actualizar texto del botón ── */
-  function refrescarBoton() {
+  // Mostrar/actualizar botón SOLO si hay más de 1 cámara
+  function mostrarBoton() {
     const btn = document.getElementById('btn-cambiar-camara');
     const txt = document.getElementById('txt-camara');
-    if (camaras.length <= 1) {
-      btn.style.display = 'none'; // ocultar si solo hay 1 cámara
-      return;
-    }
+    if (camaras.length <= 1) { btn.style.display = 'none'; return; }
+    btn.style.display = 'flex';
     btn.classList.remove('disabled');
-    // Mostrar hacia dónde cambiará (la siguiente)
-    const sig  = camaras[(idxActual + 1) % camaras.length];
-    const label = (sig.label || '').toLowerCase();
-    const esDelantera = label.includes('front') || label.includes('delantera') || label.includes('user');
+    // Texto = hacia dónde va a cambiar (la siguiente)
+    const sig = camaras[(idxActual + 1) % camaras.length];
+    const lbl = (sig.label || '').toLowerCase();
+    const esDelantera = lbl.includes('front') || lbl.includes('delantera')
+                     || lbl.includes('user')  || lbl.includes('facing front');
     txt.textContent = esDelantera ? '📷 Cámara delantera' : '📷 Cámara trasera';
   }
 
-  /* ── Error de cámara ── */
-  function mostrarError(msg) {
+  function mostrarErrorCamara(msg) {
     document.getElementById('loading').innerHTML =
       '<p style="color:#b91c1c;font-size:13px;padding:16px;line-height:1.8;text-align:left">' +
       '❌ <strong>Sin acceso a la cámara</strong><br><br>' +
@@ -257,38 +195,34 @@
       '<small style="color:#94a3b8">' + (msg || '') + '</small></p>';
   }
 
-  /* ── Arrancar escáner con un ID de cámara ── */
-  function arrancar(camaraId) {
-    return new Promise(function(resolve, reject) {
-      // Destruir instancia previa completamente
-      const viejo = document.getElementById('qr-reader');
-      viejo.innerHTML = '<div id="loading" style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:32px 0;color:#64748b;font-size:14px"><div class="spinner"></div><span>Cambiando cámara...</span></div><div id="marco-guia"></div>';
-
-      scanner = new Html5Qrcode('qr-reader');
-      scanner.start(camaraId, getCfg(), (decoded) => registrar(decoded.trim()), () => {})
-        .then(resolve)
-        .catch(reject);
-    });
+  // Reiniciar el contenedor del escáner
+  function resetContainer() {
+    document.getElementById('qr-reader').innerHTML =
+      '<div id="loading" style="display:flex;flex-direction:column;align-items:center;' +
+      'gap:10px;padding:32px 0;color:#64748b;font-size:14px">' +
+      '<div class="spinner"></div><span>Cambiando cámara...</span></div>' +
+      '<div id="marco-guia"></div>';
   }
 
-  /* ── Iniciar escáner al cargar ── */
+  // Arrancar con ID de cámara (string) o constraint (objeto facingMode)
+  function arrancar(camId) {
+    scanner = new Html5Qrcode('qr-reader');
+    return scanner.start(camId, getCfg(), d => registrar(d.trim()), () => {});
+  }
+
+  // Flujo de inicio: obtener lista real de cámaras
   function iniciarScanner() {
     Html5Qrcode.getCameras()
       .then(function(lista) {
         if (!lista || lista.length === 0) {
-          mostrarError('No se encontraron cámaras.'); return;
+          usarFallback(); return;
         }
 
-        // Ordenar: trasera primero
-        // En Android la cámara trasera suele tener "back" en el label
+        // Ordenar: trasera primero (label suele contener "back" o "0")
         lista.sort(function(a, b) {
-          const aBack = (a.label || '').toLowerCase().includes('back')
-                     || (a.label || '').toLowerCase().includes('trasera')
-                     || (a.label || '').toLowerCase().includes('rear');
-          const bBack = (b.label || '').toLowerCase().includes('back')
-                     || (b.label || '').toLowerCase().includes('trasera')
-                     || (b.label || '').toLowerCase().includes('rear');
-          return (bBack ? 1 : 0) - (aBack ? 1 : 0);
+          const aEs = /(back|trasera|rear|0)/i.test(a.label || '');
+          const bEs = /(back|trasera|rear|0)/i.test(b.label || '');
+          return (bEs ? 1 : 0) - (aEs ? 1 : 0);
         });
 
         camaras   = lista;
@@ -298,28 +232,47 @@
           .then(function() {
             document.getElementById('loading').style.display    = 'none';
             document.getElementById('marco-guia').style.display = 'block';
-            refrescarBoton();
+            mostrarBoton();
           })
-          .catch(mostrarError);
+          .catch(function(e) { mostrarErrorCamara(e); });
+      })
+      .catch(usarFallback);
+  }
+
+  // Fallback cuando getCameras() no funciona en el navegador
+  function usarFallback() {
+    camaras   = [{ id: { facingMode: 'environment' }, label: 'Cámara trasera'   },
+                 { id: { facingMode: 'user' },        label: 'Cámara delantera' }];
+    idxActual = 0;
+    arrancar({ facingMode: 'environment' })
+      .then(function() {
+        document.getElementById('loading').style.display    = 'none';
+        document.getElementById('marco-guia').style.display = 'block';
+        // Verificar si realmente existe cámara delantera antes de mostrar botón
+        verificarCamaraDelantera();
+      })
+      .catch(function(e) { mostrarErrorCamara(e); });
+  }
+
+  // Verificar existencia de cámara delantera sin cambiar la actual
+  function verificarCamaraDelantera() {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      .then(function(stream) {
+        // Sí existe cámara delantera
+        stream.getTracks().forEach(t => t.stop());
+        mostrarBoton(); // muestra el botón
       })
       .catch(function() {
-        // Fallback cuando getCameras falla (algunos navegadores móviles)
-        camaras   = [{ id: { facingMode: 'environment' }, label: 'Cámara trasera' },
-                     { id: { facingMode: 'user' },        label: 'Cámara delantera' }];
-        idxActual = 0;
-        arrancar(camaras[0].id)
-          .then(function() {
-            document.getElementById('loading').style.display    = 'none';
-            document.getElementById('marco-guia').style.display = 'block';
-            refrescarBoton();
-          })
-          .catch(mostrarError);
+        // No hay cámara delantera → ocultar botón
+        camaras = [camaras[0]];
+        document.getElementById('btn-cambiar-camara').style.display = 'none';
       });
   }
 
-  /* ── Cambiar cámara ── */
+  // Cambiar entre cámaras
   function cambiarCamara() {
-    if (!scanner || camaras.length <= 1) return;
+    if (!scanner || camaras.length <= 1 || cambiando) return;
+    cambiando = true;
 
     const btn = document.getElementById('btn-cambiar-camara');
     const txt = document.getElementById('txt-camara');
@@ -329,37 +282,39 @@
     const sigIdx = (idxActual + 1) % camaras.length;
     const sigCam = camaras[sigIdx];
 
-    // Detener escáner actual y esperar a que libere el hardware
     scanner.stop()
-      .catch(() => {}) // ignorar error al detener
+      .catch(() => {})
       .finally(function() {
-        // Esperar 600ms para que Android libere la cámara
+        // Pausa 800ms para que Android libere el hardware de la cámara
         setTimeout(function() {
+          resetContainer();
           arrancar(sigCam.id)
             .then(function() {
               idxActual = sigIdx;
               document.getElementById('loading').style.display    = 'none';
               document.getElementById('marco-guia').style.display = 'block';
-              refrescarBoton();
+              cambiando = false;
+              mostrarBoton();
             })
-            .catch(function(err) {
-              // Si falla, volver a la cámara anterior
+            .catch(function() {
+              // Falló: volver a la cámara original con otra pausa
               setTimeout(function() {
+                resetContainer();
                 arrancar(camaras[idxActual].id)
                   .then(function() {
                     document.getElementById('loading').style.display    = 'none';
                     document.getElementById('marco-guia').style.display = 'block';
-                    refrescarBoton();
-                    mostrar('⚠️ La cámara solicitada no está disponible', 'warn', 3000);
+                    cambiando = false;
+                    mostrarBoton();
+                    mostrar('⚠️ Cámara no disponible, volviendo a la anterior', 'warn', 3000);
                   })
-                  .catch(mostrarError);
-              }, 600);
+                  .catch(function(e) { cambiando = false; mostrarErrorCamara(e); });
+              }, 800);
             });
-        }, 600);
+        }, 800);
       });
   }
 
-  /* ── Cerrar ventana ── */
   function cerrar() {
     if (scanner) scanner.stop().catch(() => {}).finally(() => window.close());
     else window.close();
