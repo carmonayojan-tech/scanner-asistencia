@@ -49,7 +49,7 @@
     /* Visor QR */
     #visor-wrap {
       width: 100%; border-radius: 12px; overflow: hidden;
-      margin-bottom: 12px; background: #000; min-height: 420px;
+      margin-bottom: 12px; background: #000; min-height: 2600px;
       position: relative; display: flex; align-items: center; justify-content: center;
     }
     #qr-reader { width: 100%; }
@@ -60,7 +60,7 @@
     #marco-guia {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 140px; height: 140px;
+      width: 190px; height: 190px;
       border: 3px solid #22c55e; border-radius: 12px;
       box-shadow: 0 0 0 9999px rgba(0,0,0,.38);
       pointer-events: none; z-index: 10;
@@ -231,7 +231,7 @@
   ══════════════════════════════════════════ */
   function getCfg() {
     const dim = Math.round(Math.min(window.innerWidth - 80, 380) * 0.58);
-  return { fps: 12, qrbox: { width: 140, height: 140 }, aspectRatio: 1.0, disableFlip: false }
+  return { fps: 12, qrbox: { width: dim, height: dim }, aspectRatio: 1.0, disableFlip: false };
   }
 
   /* ══════════════════════════════════════════
