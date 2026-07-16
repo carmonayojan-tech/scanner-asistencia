@@ -62,11 +62,12 @@
       cursor: pointer;
       color: #334155;
       transition: .18s;
+      user-select: none;
     }
-    .btn-camara:hover { background: #e2e8f0; }
+    .btn-camara:hover  { background: #e2e8f0; }
     .btn-camara:active { transform: scale(.96); }
-    .btn-camara svg { width: 18px; height: 18px; }
-    .btn-camara.cargando { opacity: .5; pointer-events: none; }
+    .btn-camara.disabled { opacity: .4; pointer-events: none; }
+    .btn-camara svg { width: 18px; height: 18px; flex-shrink: 0; }
 
     #qr-reader {
       width: 100%;
@@ -146,12 +147,13 @@
   </div>
 
   <div class="camara-wrap">
-    <button class="btn-camara" id="btn-cambiar-camara" onclick="cambiarCamara()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <button class="btn-camara disabled" id="btn-cambiar-camara" onclick="cambiarCamara()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
         <circle cx="12" cy="13" r="4"/>
       </svg>
-      <span id="txt-camara">Cámara delantera</span>
+      <span id="txt-camara">Detectando cámaras...</span>
     </button>
   </div>
 
@@ -168,37 +170,30 @@
 </div>
 
 <script>
-  if (!APP_URL || APP_URL === 'TU_URL_AQUI' || APP_URL.includes('TU_URL')) {
-    window.addEventListener('DOMContentLoaded', function() {
-      document.getElementById('loading').innerHTML =
-        '<p style="color:#b91c1c;font-size:13px;padding:16px;line-height:1.8;text-align:left">' +
-        '⚠️ <strong>URL no configurada</strong><br><br>' +
-        'Reemplaza <strong>TU_URL_AQUI</strong> con la URL de tu Web App.</p>';
-    });
-  }
+  /* ── Estado global ── */
+  let estadoActual  = 'INGRESO';
+  let procesando    = false;
+  let scanner       = null;
+  let camaras       = [];   // [{id, label}]
+  let idxActual     = 0;    // índice en el array camaras
 
-  let estadoActual = 'INGRESO';
-  let procesando   = false;
-  let scanner      = null;
-
-  // Lista de cámaras disponibles y índice actual
-  let listaCamaras  = [];
-  let indiceCamara  = 0; // 0 = trasera, 1 = delantera (si existe)
-
+  /* ── Ingreso / Salida ── */
   function setEstado(e) {
     estadoActual = e;
     document.getElementById('btn-ingreso').classList.toggle('active', e === 'INGRESO');
     document.getElementById('btn-salida').classList.toggle('active',  e === 'SALIDA');
   }
 
-  function mostrar(msg, tipo, autoOcultar) {
+  /* ── Resultado visual ── */
+  function mostrar(msg, tipo, ms) {
     const r = document.getElementById('resultado');
     r.textContent   = msg;
     r.className     = tipo;
     r.style.display = 'block';
-    if (autoOcultar) setTimeout(() => { r.style.display = 'none'; procesando = false; }, autoOcultar);
+    if (ms) setTimeout(() => { r.style.display = 'none'; procesando = false; }, ms);
   }
 
+  /* ── Registrar asistencia vía JSONP ── */
   function registrar(id) {
     if (procesando) return;
     procesando = true;
@@ -212,184 +207,162 @@
     let   timer;
 
     window[cbName] = function(data) {
-      clearTimeout(timer);
-      tag.remove();
-      delete window[cbName];
-      if (data.exito) {
-        mostrar('✅ ' + data.estado + ': ' + data.nombre + '\n🕐 ' + data.hora, 'ok', 4000);
-      } else {
-        mostrar('⚠️ ' + data.mensaje, 'warn', 4000);
-      }
+      clearTimeout(timer); tag.remove(); delete window[cbName];
+      if (data.exito) mostrar('✅ ' + data.estado + ': ' + data.nombre + '\n🕐 ' + data.hora, 'ok', 4000);
+      else            mostrar('⚠️ ' + data.mensaje, 'warn', 4000);
     };
 
     timer = setTimeout(function() {
-      tag.remove();
-      delete window[cbName];
-      mostrar('❌ Sin respuesta del servidor.\n\nVerifica:\n• La URL del Web App es correcta\n• La app está publicada ("Cualquier persona")', 'err', 6000);
+      tag.remove(); delete window[cbName];
+      mostrar('❌ Sin respuesta del servidor.\n\nVerifica:\n• URL del Web App correcta\n• App publicada ("Cualquier persona")', 'err', 6000);
     }, 12000);
 
     tag.src = APP_URL
-      + '?page=registrar_jsonp'
-      + '&callback=' + cbName
-      + '&id='       + encodeURIComponent(id)
-      + '&estado='   + encodeURIComponent(estadoActual);
+      + '?page=registrar_jsonp&callback=' + cbName
+      + '&id='     + encodeURIComponent(id)
+      + '&estado=' + encodeURIComponent(estadoActual);
     document.head.appendChild(tag);
   }
 
+  /* ── Configuración del escáner ── */
   function getCfg() {
     const dim = Math.round(Math.min(window.innerWidth - 80, 380) * 0.58);
-    return { fps: 15, qrbox: { width: dim, height: dim }, aspectRatio: 1.0, disableFlip: false };
+    return { fps: 12, qrbox: { width: dim, height: dim }, aspectRatio: 1.0, disableFlip: false };
   }
 
-  const onDecode = (decoded) => registrar(decoded.trim());
-  const onError  = () => {};
-
-  function actualizarBoton() {
+  /* ── Actualizar texto del botón ── */
+  function refrescarBoton() {
     const btn = document.getElementById('btn-cambiar-camara');
     const txt = document.getElementById('txt-camara');
-    btn.classList.remove('cargando');
-
-    if (listaCamaras.length <= 1) {
-      // Solo hay una cámara — ocultar botón
-      btn.style.display = 'none';
+    if (camaras.length <= 1) {
+      btn.style.display = 'none'; // ocultar si solo hay 1 cámara
       return;
     }
-
-    // Mostrar hacia dónde va a cambiar (la opuesta)
-    const siguienteIdx = (indiceCamara + 1) % listaCamaras.length;
-    const siguiente    = listaCamaras[siguienteIdx];
-    const esDelantera  = siguiente.label.toLowerCase().includes('front')
-                      || siguiente.label.toLowerCase().includes('delantera')
-                      || siguiente.label.toLowerCase().includes('facing front')
-                      || siguienteIdx > 0;
-    txt.textContent = esDelantera ? 'Cámara delantera' : 'Cámara trasera';
+    btn.classList.remove('disabled');
+    // Mostrar hacia dónde cambiará (la siguiente)
+    const sig  = camaras[(idxActual + 1) % camaras.length];
+    const label = (sig.label || '').toLowerCase();
+    const esDelantera = label.includes('front') || label.includes('delantera') || label.includes('user');
+    txt.textContent = esDelantera ? '📷 Cámara delantera' : '📷 Cámara trasera';
   }
 
-  function mostrarErrorCamara(err) {
+  /* ── Error de cámara ── */
+  function mostrarError(msg) {
     document.getElementById('loading').innerHTML =
       '<p style="color:#b91c1c;font-size:13px;padding:16px;line-height:1.8;text-align:left">' +
       '❌ <strong>Sin acceso a la cámara</strong><br><br>' +
-      '1. Haz clic en el ícono 🔒 junto a la URL<br>' +
+      '1. Toca el ícono 🔒 junto a la URL<br>' +
       '2. Cambia "Cámara" → <strong>Permitir</strong><br>' +
-      '3. Recarga la página (F5)<br><br>' +
-      '<small style="color:#94a3b8">' + (err || '') + '</small></p>';
+      '3. Recarga la página<br><br>' +
+      '<small style="color:#94a3b8">' + (msg || '') + '</small></p>';
   }
 
-  function arrancarConId(camaraId) {
-    return new Promise((resolve, reject) => {
+  /* ── Arrancar escáner con un ID de cámara ── */
+  function arrancar(camaraId) {
+    return new Promise(function(resolve, reject) {
+      // Destruir instancia previa completamente
+      const viejo = document.getElementById('qr-reader');
+      viejo.innerHTML = '<div id="loading" style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:32px 0;color:#64748b;font-size:14px"><div class="spinner"></div><span>Cambiando cámara...</span></div><div id="marco-guia"></div>';
+
       scanner = new Html5Qrcode('qr-reader');
-      scanner.start(camaraId, getCfg(), onDecode, onError)
+      scanner.start(camaraId, getCfg(), (decoded) => registrar(decoded.trim()), () => {})
         .then(resolve)
         .catch(reject);
     });
   }
 
+  /* ── Iniciar escáner al cargar ── */
   function iniciarScanner() {
-    // Obtener lista real de cámaras del dispositivo
     Html5Qrcode.getCameras()
-      .then(function(camaras) {
-        if (!camaras || camaras.length === 0) {
-          mostrarErrorCamara('No se encontraron cámaras en este dispositivo.');
-          return;
+      .then(function(lista) {
+        if (!lista || lista.length === 0) {
+          mostrarError('No se encontraron cámaras.'); return;
         }
 
-        listaCamaras = camaras;
+        // Ordenar: trasera primero
+        // En Android la cámara trasera suele tener "back" en el label
+        lista.sort(function(a, b) {
+          const aBack = (a.label || '').toLowerCase().includes('back')
+                     || (a.label || '').toLowerCase().includes('trasera')
+                     || (a.label || '').toLowerCase().includes('rear');
+          const bBack = (b.label || '').toLowerCase().includes('back')
+                     || (b.label || '').toLowerCase().includes('trasera')
+                     || (b.label || '').toLowerCase().includes('rear');
+          return (bBack ? 1 : 0) - (aBack ? 1 : 0);
+        });
 
-        // Buscar cámara trasera (back/environment) como índice 0
-        // En Android suele ser la primera; buscamos por label para estar seguros
-        const idxTrasera = camaras.findIndex(c =>
-          c.label.toLowerCase().includes('back')
-          || c.label.toLowerCase().includes('trasera')
-          || c.label.toLowerCase().includes('rear')
-          || c.label.toLowerCase().includes('environment')
-        );
+        camaras   = lista;
+        idxActual = 0;
 
-        // Si encontramos trasera, ponerla primero en la lista
-        if (idxTrasera > 0) {
-          const trasera = camaras.splice(idxTrasera, 1)[0];
-          listaCamaras.unshift(trasera);
-        }
-
-        indiceCamara = 0;
-        arrancarConId(listaCamaras[0].id)
+        arrancar(camaras[0].id)
           .then(function() {
             document.getElementById('loading').style.display    = 'none';
             document.getElementById('marco-guia').style.display = 'block';
-            actualizarBoton();
+            refrescarBoton();
           })
-          .catch(mostrarErrorCamara);
+          .catch(mostrarError);
       })
-      .catch(function(err) {
-        // Fallback: intentar con facingMode si getCameras falla
-        scanner = new Html5Qrcode('qr-reader');
-        scanner.start({ facingMode: 'environment' }, getCfg(), onDecode, onError)
+      .catch(function() {
+        // Fallback cuando getCameras falla (algunos navegadores móviles)
+        camaras   = [{ id: { facingMode: 'environment' }, label: 'Cámara trasera' },
+                     { id: { facingMode: 'user' },        label: 'Cámara delantera' }];
+        idxActual = 0;
+        arrancar(camaras[0].id)
           .then(function() {
-            listaCamaras = [{ id: 'environment', label: 'Cámara trasera' },
-                            { id: 'user',        label: 'Cámara delantera' }];
-            indiceCamara = 0;
             document.getElementById('loading').style.display    = 'none';
             document.getElementById('marco-guia').style.display = 'block';
-            actualizarBoton();
+            refrescarBoton();
           })
-          .catch(mostrarErrorCamara);
+          .catch(mostrarError);
       });
   }
 
+  /* ── Cambiar cámara ── */
   function cambiarCamara() {
-    if (!scanner || listaCamaras.length <= 1) return;
+    if (!scanner || camaras.length <= 1) return;
 
     const btn = document.getElementById('btn-cambiar-camara');
     const txt = document.getElementById('txt-camara');
-    btn.classList.add('cargando');
+    btn.classList.add('disabled');
     txt.textContent = 'Cambiando...';
 
-    const siguienteIdx = (indiceCamara + 1) % listaCamaras.length;
-    const siguienteCam = listaCamaras[siguienteIdx];
+    const sigIdx = (idxActual + 1) % camaras.length;
+    const sigCam = camaras[sigIdx];
 
+    // Detener escáner actual y esperar a que libere el hardware
     scanner.stop()
-      .then(function() {
-        document.getElementById('loading').style.display    = 'flex';
-        document.getElementById('marco-guia').style.display = 'none';
-
-        // Usar ID real de cámara o facingMode como fallback
-        const camaraId = siguienteCam.id === 'user' || siguienteCam.id === 'environment'
-          ? { facingMode: siguienteCam.id }
-          : siguienteCam.id;
-
-        scanner = new Html5Qrcode('qr-reader');
-        return scanner.start(camaraId, getCfg(), onDecode, onError);
-      })
-      .then(function() {
-        indiceCamara = siguienteIdx;
-        document.getElementById('loading').style.display    = 'none';
-        document.getElementById('marco-guia').style.display = 'block';
-        actualizarBoton();
-      })
-      .catch(function() {
-        // Si falla, volver a la cámara anterior
-        const camAnterior = listaCamaras[indiceCamara];
-        const camaraId = camAnterior.id === 'user' || camAnterior.id === 'environment'
-          ? { facingMode: camAnterior.id }
-          : camAnterior.id;
-
-        scanner = new Html5Qrcode('qr-reader');
-        scanner.start(camaraId, getCfg(), onDecode, onError)
-          .then(function() {
-            document.getElementById('loading').style.display    = 'none';
-            document.getElementById('marco-guia').style.display = 'block';
-            actualizarBoton();
-          })
-          .catch(mostrarErrorCamara);
-        mostrar('⚠️ No se pudo cambiar de cámara', 'warn', 3000);
+      .catch(() => {}) // ignorar error al detener
+      .finally(function() {
+        // Esperar 600ms para que Android libere la cámara
+        setTimeout(function() {
+          arrancar(sigCam.id)
+            .then(function() {
+              idxActual = sigIdx;
+              document.getElementById('loading').style.display    = 'none';
+              document.getElementById('marco-guia').style.display = 'block';
+              refrescarBoton();
+            })
+            .catch(function(err) {
+              // Si falla, volver a la cámara anterior
+              setTimeout(function() {
+                arrancar(camaras[idxActual].id)
+                  .then(function() {
+                    document.getElementById('loading').style.display    = 'none';
+                    document.getElementById('marco-guia').style.display = 'block';
+                    refrescarBoton();
+                    mostrar('⚠️ La cámara solicitada no está disponible', 'warn', 3000);
+                  })
+                  .catch(mostrarError);
+              }, 600);
+            });
+        }, 600);
       });
   }
 
+  /* ── Cerrar ventana ── */
   function cerrar() {
-    if (scanner) {
-      scanner.stop().catch(() => {}).finally(() => window.close());
-    } else {
-      window.close();
-    }
+    if (scanner) scanner.stop().catch(() => {}).finally(() => window.close());
+    else window.close();
   }
 
   window.addEventListener('load', iniciarScanner);
