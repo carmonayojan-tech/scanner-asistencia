@@ -24,6 +24,7 @@
     .logo { font-size: 32px; margin-bottom: 4px; }
     h1 { font-size: 20px; color: #0f172a; margin-bottom: 4px; }
     .sub { font-size: 12px; color: #64748b; margin-bottom: 14px; line-height: 1.5; }
+
     .estado-wrap { display: flex; gap: 8px; margin-bottom: 10px; }
     .estado-btn {
       flex: 1; padding: 10px; border: 2px solid #e2e8f0;
@@ -31,31 +32,56 @@
       font-size: 14px; font-weight: 700; cursor: pointer; transition: .18s; color: #334155;
     }
     .estado-btn.active { border-color: #2196F3; background: #2196F3; color: #fff; }
-    .camara-wrap { display: flex; justify-content: flex-end; margin-bottom: 10px; }
-    .btn-camara {
-      display: none; /* oculto por defecto, se muestra solo en móvil */
+
+    /* Botón cámara — oculto por defecto */
+    .camara-wrap { display: flex; justify-content: flex-end; margin-bottom: 10px; min-height: 36px; }
+    #btn-cambiar-camara {
+      display: none;
       align-items: center; gap: 6px; padding: 7px 14px;
       border: 2px solid #e2e8f0; border-radius: 10px; background: #f8fafc;
       font-size: 13px; font-weight: 600; cursor: pointer; color: #334155;
       transition: .18s; user-select: none;
     }
-    .btn-camara:hover  { background: #e2e8f0; }
-    .btn-camara:active { transform: scale(.96); }
-    .btn-camara.disabled { opacity: .4; pointer-events: none; }
-    .btn-camara svg { width: 18px; height: 18px; flex-shrink: 0; }
-    #qr-reader {
+    #btn-cambiar-camara:hover  { background: #e2e8f0; }
+    #btn-cambiar-camara:active { transform: scale(.96); }
+    #btn-cambiar-camara svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+    /* Visor QR */
+    #visor-wrap {
       width: 100%; border-radius: 12px; overflow: hidden;
-      margin-bottom: 12px; background: #000; min-height: 240px; position: relative;
+      margin-bottom: 12px; background: #000; min-height: 260px;
+      position: relative; display: flex; align-items: center; justify-content: center;
     }
+    #qr-reader { width: 100%; }
     #qr-reader__dashboard, #qr-reader__header_message,
     #qr-reader__status_span { display: none !important; }
-    #qr-reader video { border-radius: 12px; width: 100% !important; }
+    #qr-reader video { width: 100% !important; display: block; }
+
     #marco-guia {
-      display: none; position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%); width: 190px; height: 190px;
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 190px; height: 190px;
       border: 3px solid #22c55e; border-radius: 12px;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,.38); pointer-events: none; z-index: 10;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,.38);
+      pointer-events: none; z-index: 10;
+      display: none;
     }
+    #overlay-msg {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 10px; color: #94a3b8; font-size: 14px;
+      background: #000; border-radius: 12px; z-index: 5;
+    }
+    .spinner {
+      width: 36px; height: 36px; border: 4px solid #334155;
+      border-top-color: #2196F3; border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin  { to { transform: rotate(360deg); } }
+    @keyframes flash { 0%{opacity:1} 50%{opacity:.2} 100%{opacity:1} }
+    .flash-anim { animation: flash .25s ease; }
+
     #resultado {
       display: none; border-radius: 10px; padding: 12px 14px;
       font-size: 14px; font-weight: 600; margin-bottom: 12px;
@@ -64,25 +90,13 @@
     .ok   { background: #dcfce7; color: #166534; border: 1.5px solid #86efac; }
     .warn { background: #fef3c7; color: #92400e; border: 1.5px solid #fcd34d; }
     .err  { background: #fee2e2; color: #b91c1c; border: 1.5px solid #fca5a5; }
+
     .btn-cerrar {
       width: 100%; padding: 13px; border: none; border-radius: 12px;
       font-size: 15px; font-weight: 700; cursor: pointer; color: #fff;
       background: #ef4444; transition: .18s;
     }
     .btn-cerrar:hover { background: #dc2626; }
-    #loading {
-      display: flex; flex-direction: column;
-      align-items: center; gap: 10px;
-      padding: 32px 0; color: #64748b; font-size: 14px;
-    }
-    .spinner {
-      width: 36px; height: 36px; border: 4px solid #e2e8f0;
-      border-top-color: #2196F3; border-radius: 50%;
-      animation: spin .8s linear infinite;
-    }
-    @keyframes spin  { to { transform: rotate(360deg); } }
-    @keyframes flash { 0%{opacity:1} 50%{opacity:.2} 100%{opacity:1} }
-    .detectado { animation: flash .25s ease; }
   </style>
 </head>
 <body>
@@ -97,22 +111,23 @@
   </div>
 
   <div class="camara-wrap">
-    <button class="btn-camara" id="btn-cambiar-camara" onclick="cambiarCamara()">
+    <button id="btn-cambiar-camara" onclick="cambiarCamara()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round">
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
         <circle cx="12" cy="13" r="4"/>
       </svg>
-      <span id="txt-camara">📷 Cámara delantera</span>
+      <span id="txt-camara">Cámara delantera</span>
     </button>
   </div>
 
-  <div id="qr-reader" style="position:relative">
-    <div id="loading">
-      <div class="spinner"></div>
-      <span>Iniciando cámara...</span>
-    </div>
+  <div id="visor-wrap">
+    <div id="qr-reader"></div>
     <div id="marco-guia"></div>
+    <div id="overlay-msg">
+      <div class="spinner"></div>
+      <span id="overlay-txt">Iniciando cámara...</span>
+    </div>
   </div>
 
   <div id="resultado"></div>
@@ -120,19 +135,49 @@
 </div>
 
 <script>
-  let estadoActual = 'INGRESO';
-  let procesando   = false;
-  let scanner      = null;
-  let usandoTrasera = true;  // true = trasera, false = delantera
+  /* ══════════════════════════════════════════
+     ESTADO GLOBAL
+  ══════════════════════════════════════════ */
+  let estadoActual  = 'INGRESO';
+  let procesando    = false;
+  let scanner       = null;
   let cambiando     = false;
-  let listaIds      = [];    // IDs reales de cámaras del dispositivo
+  let idTrasera     = null;   // ID real de cámara trasera
+  let idDelantera   = null;   // ID real de cámara delantera
+  let usandoTrasera = true;
 
   const esMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
+  /* ══════════════════════════════════════════
+     UI HELPERS
+  ══════════════════════════════════════════ */
   function setEstado(e) {
     estadoActual = e;
     document.getElementById('btn-ingreso').classList.toggle('active', e === 'INGRESO');
     document.getElementById('btn-salida').classList.toggle('active',  e === 'SALIDA');
+  }
+
+  function mostrarOverlay(texto) {
+    const o = document.getElementById('overlay-msg');
+    document.getElementById('overlay-txt').textContent = texto;
+    o.style.display = 'flex';
+    document.getElementById('marco-guia').style.display = 'none';
+  }
+
+  function ocultarOverlay() {
+    document.getElementById('overlay-msg').style.display = 'none';
+    document.getElementById('marco-guia').style.display  = 'block';
+  }
+
+  function mostrarError(msg) {
+    document.getElementById('overlay-msg').innerHTML =
+      '<p style="color:#fca5a5;font-size:13px;padding:16px;line-height:1.8;text-align:left">' +
+      '❌ <strong>Sin acceso a la cámara</strong><br><br>' +
+      '1. Toca el ícono 🔒 junto a la URL<br>' +
+      '2. Cambia "Cámara" → <strong>Permitir</strong><br>' +
+      '3. Recarga la página<br><br>' +
+      '<small style="opacity:.7">' + (msg || '') + '</small></p>';
+    document.getElementById('overlay-msg').style.display = 'flex';
   }
 
   function mostrar(msg, tipo, ms) {
@@ -141,11 +186,27 @@
     if (ms) setTimeout(() => { r.style.display = 'none'; procesando = false; }, ms);
   }
 
+  function actualizarBoton() {
+    document.getElementById('txt-camara').textContent =
+      usandoTrasera ? 'Cámara delantera' : 'Cámara trasera';
+    document.getElementById('btn-cambiar-camara').style.opacity  = '1';
+    document.getElementById('btn-cambiar-camara').style.pointerEvents = 'auto';
+  }
+
+  function bloquearBoton(txt) {
+    document.getElementById('txt-camara').textContent = txt || 'Cambiando...';
+    document.getElementById('btn-cambiar-camara').style.opacity  = '0.4';
+    document.getElementById('btn-cambiar-camara').style.pointerEvents = 'none';
+  }
+
+  /* ══════════════════════════════════════════
+     REGISTRO JSONP
+  ══════════════════════════════════════════ */
   function registrar(id) {
     if (procesando) return;
     procesando = true;
-    document.getElementById('qr-reader').classList.add('detectado');
-    setTimeout(() => document.getElementById('qr-reader').classList.remove('detectado'), 250);
+    document.getElementById('visor-wrap').classList.add('flash-anim');
+    setTimeout(() => document.getElementById('visor-wrap').classList.remove('flash-anim'), 250);
     mostrar('⏳ Leyendo: ' + id, 'warn', 0);
 
     const cbName = 'cb_' + Date.now();
@@ -158,211 +219,158 @@
     };
     timer = setTimeout(function() {
       tag.remove(); delete window[cbName];
-      mostrar('❌ Sin respuesta del servidor.\n\nVerifica:\n• URL del Web App correcta\n• App publicada ("Cualquier persona")', 'err', 6000);
+      mostrar('❌ Sin respuesta.\n\nVerifica:\n• URL del Web App correcta\n• App publicada ("Cualquier persona")', 'err', 6000);
     }, 12000);
     tag.src = APP_URL + '?page=registrar_jsonp&callback=' + cbName
       + '&id=' + encodeURIComponent(id) + '&estado=' + encodeURIComponent(estadoActual);
     document.head.appendChild(tag);
   }
 
+  /* ══════════════════════════════════════════
+     CONFIGURACIÓN ESCÁNER
+  ══════════════════════════════════════════ */
   function getCfg() {
     const dim = Math.round(Math.min(window.innerWidth - 80, 380) * 0.58);
     return { fps: 12, qrbox: { width: dim, height: dim }, aspectRatio: 1.0, disableFlip: false };
   }
 
-  function mostrarErrorCamara(msg) {
-    document.getElementById('qr-reader').innerHTML =
-      '<p style="color:#b91c1c;font-size:13px;padding:16px;line-height:1.8;text-align:left">' +
-      '❌ <strong>Sin acceso a la cámara</strong><br><br>' +
-      '1. Toca el ícono 🔒 junto a la URL<br>' +
-      '2. Cambia "Cámara" → <strong>Permitir</strong><br>' +
-      '3. Recarga la página<br><br>' +
-      '<small style="color:#94a3b8">' + (msg || '') + '</small></p>';
-  }
-
-  function resetContainer() {
-    document.getElementById('qr-reader').innerHTML =
-      '<div id="loading" style="display:flex;flex-direction:column;align-items:center;' +
-      'gap:10px;padding:32px 0;color:#64748b;font-size:14px">' +
-      '<div class="spinner"></div><span>Cambiando cámara...</span></div>' +
-      '<div id="marco-guia"></div>';
-  }
-
-  function actualizarBoton() {
-    const txt = document.getElementById('txt-camara');
-    const btn = document.getElementById('btn-cambiar-camara');
-    btn.classList.remove('disabled');
-    txt.textContent = usandoTrasera ? '📷 Cámara delantera' : '📷 Cámara trasera';
-  }
-
-  /* ── Arrancar con ID real de cámara ── */
-  function arrancarConId(camaraId) {
+  /* ══════════════════════════════════════════
+     ARRANCAR ESCÁNER CON ID O FACINGMODE
+  ══════════════════════════════════════════ */
+  function arrancar(camaraId) {
+    // Destruir instancia previa si existe
+    if (scanner) {
+      try { scanner.clear(); } catch(e) {}
+      scanner = null;
+    }
+    document.getElementById('qr-reader').innerHTML = '';
     scanner = new Html5Qrcode('qr-reader');
     return scanner.start(camaraId, getCfg(), d => registrar(d.trim()), () => {});
   }
 
-  /* ── Inicio: obtener IDs reales y arrancar trasera ── */
+  /* ══════════════════════════════════════════
+     INICIO
+  ══════════════════════════════════════════ */
   function iniciarScanner() {
+    mostrarOverlay('Iniciando cámara...');
+
     Html5Qrcode.getCameras()
       .then(function(lista) {
         if (!lista || lista.length === 0) {
-          mostrarErrorCamara('No se encontraron cámaras.'); return;
+          iniciarConFacingMode(); return;
         }
 
-        // Guardar IDs reales
-        listaIds = lista;
+        // Clasificar cámaras por label
+        lista.forEach(function(cam) {
+          const lbl = (cam.label || '').toLowerCase();
+          const esTrasera = lbl.includes('back') || lbl.includes('rear')
+                         || lbl.includes('trasera') || lbl.includes('0,');
+          const esDelantera = lbl.includes('front') || lbl.includes('delantera')
+                           || lbl.includes('user')  || lbl.includes('facing front');
+          if (esTrasera  && !idTrasera)   idTrasera   = cam.id;
+          if (esDelantera && !idDelantera) idDelantera = cam.id;
+        });
 
-        // Mostrar botón solo si hay más de 1 cámara
-        if (esMobile && lista.length > 1) {
+        // Fallback: si no se clasificaron por label, usar posición
+        if (!idTrasera   && lista.length >= 1) idTrasera   = lista[0].id;
+        if (!idDelantera && lista.length >= 2) idDelantera = lista[1].id;
+
+        // Mostrar botón solo si hay delantera disponible en móvil
+        if (esMobile && idDelantera && idDelantera !== idTrasera) {
           document.getElementById('btn-cambiar-camara').style.display = 'flex';
         }
 
-        // Buscar cámara trasera por label
-        let idTrasera = lista[0].id; // default: primera
-        for (let i = 0; i < lista.length; i++) {
-          const lbl = (lista[i].label || '').toLowerCase();
-          if (lbl.includes('back') || lbl.includes('trasera') || lbl.includes('rear')) {
-            idTrasera = lista[i].id; break;
-          }
-        }
-
+        // Arrancar con trasera
         usandoTrasera = true;
-        arrancarConId(idTrasera)
-          .then(function() {
-            document.getElementById('loading').style.display    = 'none';
-            document.getElementById('marco-guia').style.display = 'block';
-            actualizarBoton();
-          })
-          .catch(function(e) { mostrarErrorCamara(e); });
+        arrancar(idTrasera)
+          .then(function() { ocultarOverlay(); actualizarBoton(); })
+          .catch(function(e) { mostrarError(e); });
       })
       .catch(function() {
-        // getCameras falló: usar facingMode como fallback
-        // Mostrar botón en móvil aunque no podamos listar cámaras
-        if (esMobile) {
-          document.getElementById('btn-cambiar-camara').style.display = 'flex';
-        }
-        usandoTrasera = true;
-        scanner = new Html5Qrcode('qr-reader');
-        scanner.start('environment', getCfg(), d => registrar(d.trim()), () => {})
-          .then(function() {
-            document.getElementById('loading').style.display    = 'none';
-            document.getElementById('marco-guia').style.display = 'block';
-            actualizarBoton();
-          })
-          .catch(function() {
-            // Último intento con facingMode objeto
-            scanner = new Html5Qrcode('qr-reader');
-            scanner.start({ facingMode: 'environment' }, getCfg(), d => registrar(d.trim()), () => {})
-              .then(function() {
-                document.getElementById('loading').style.display    = 'none';
-                document.getElementById('marco-guia').style.display = 'block';
-                actualizarBoton();
-              })
-              .catch(mostrarErrorCamara);
-          });
+        // getCameras no disponible: usar facingMode
+        iniciarConFacingMode();
       });
   }
 
-  /* ── Cambiar cámara usando IDs reales si están disponibles ── */
+  function iniciarConFacingMode() {
+    // Mostrar botón en móvil (asumimos que tienen 2 cámaras)
+    if (esMobile) {
+      document.getElementById('btn-cambiar-camara').style.display = 'flex';
+    }
+    usandoTrasera = true;
+    arrancar({ facingMode: 'environment' })
+      .then(function() { ocultarOverlay(); actualizarBoton(); })
+      .catch(function() {
+        arrancar({ facingMode: 'user' })
+          .then(function() {
+            usandoTrasera = false;
+            ocultarOverlay(); actualizarBoton();
+          })
+          .catch(mostrarError);
+      });
+  }
+
+  /* ══════════════════════════════════════════
+     CAMBIAR CÁMARA
+  ══════════════════════════════════════════ */
   function cambiarCamara() {
     if (!scanner || cambiando) return;
     cambiando = true;
-
-    const btn = document.getElementById('btn-cambiar-camara');
-    const txt = document.getElementById('txt-camara');
-    btn.classList.add('disabled');
-    txt.textContent = 'Cambiando...';
+    bloquearBoton('Cambiando...');
+    mostrarOverlay('Cambiando cámara...');
 
     const nuevaEsTrasera = !usandoTrasera;
 
-    // Determinar ID de la cámara destino
-    let idNueva = null;
-    if (listaIds.length > 1) {
-      if (nuevaEsTrasera) {
-        // Buscar trasera
-        for (let i = 0; i < listaIds.length; i++) {
-          const lbl = (listaIds[i].label || '').toLowerCase();
-          if (lbl.includes('back') || lbl.includes('trasera') || lbl.includes('rear')) {
-            idNueva = listaIds[i].id; break;
-          }
-        }
-        if (!idNueva) idNueva = listaIds[0].id;
-      } else {
-        // Buscar delantera
-        for (let i = 0; i < listaIds.length; i++) {
-          const lbl = (listaIds[i].label || '').toLowerCase();
-          if (lbl.includes('front') || lbl.includes('delantera') || lbl.includes('user')) {
-            idNueva = listaIds[i].id; break;
-          }
-        }
-        // Si no encontramos por label, usar la segunda cámara de la lista
-        if (!idNueva) idNueva = listaIds[listaIds.length > 1 ? 1 : 0].id;
-      }
+    // Determinar ID destino
+    let idDestino;
+    if (idTrasera && idDelantera) {
+      idDestino = nuevaEsTrasera ? idTrasera : idDelantera;
+    } else {
+      idDestino = { facingMode: nuevaEsTrasera ? 'environment' : 'user' };
     }
 
     scanner.stop()
       .catch(() => {})
       .finally(function() {
+        // Pausa para liberar hardware en Android
         setTimeout(function() {
-          resetContainer();
-
-          // Función que intenta arrancar con ID real o facingMode
-          const intentar = function() {
-            if (idNueva) {
-              return arrancarConId(idNueva);
-            } else {
-              // Fallback a facingMode string
-              scanner = new Html5Qrcode('qr-reader');
-              return scanner.start(
-                nuevaEsTrasera ? 'environment' : 'user',
-                getCfg(), d => registrar(d.trim()), () => {}
-              );
-            }
-          };
-
-          intentar()
+          arrancar(idDestino)
             .then(function() {
               usandoTrasera = nuevaEsTrasera;
-              document.getElementById('loading').style.display    = 'none';
-              document.getElementById('marco-guia').style.display = 'block';
-              cambiando = false;
+              ocultarOverlay();
               actualizarBoton();
+              cambiando = false;
             })
-            .catch(function() {
-              // Falló: volver a la cámara anterior
+            .catch(function(e) {
+              // Volver a la cámara anterior
+              const idAnterior = nuevaEsTrasera
+                ? (idDelantera || { facingMode: 'user' })
+                : (idTrasera   || { facingMode: 'environment' });
+
               setTimeout(function() {
-                resetContainer();
-                const idAnterior = listaIds.length > 0
-                  ? (usandoTrasera ? listaIds[0].id : (listaIds[1] ? listaIds[1].id : listaIds[0].id))
-                  : null;
-
-                const volver = function() {
-                  if (idAnterior) return arrancarConId(idAnterior);
-                  scanner = new Html5Qrcode('qr-reader');
-                  return scanner.start(
-                    usandoTrasera ? 'environment' : 'user',
-                    getCfg(), d => registrar(d.trim()), () => {}
-                  );
-                };
-
-                volver()
+                arrancar(idAnterior)
                   .then(function() {
-                    document.getElementById('loading').style.display    = 'none';
-                    document.getElementById('marco-guia').style.display = 'block';
-                    cambiando = false;
+                    ocultarOverlay();
                     actualizarBoton();
+                    cambiando = false;
                     mostrar('⚠️ Cámara no disponible, volviendo a la anterior', 'warn', 3000);
                   })
-                  .catch(function(e) { cambiando = false; mostrarErrorCamara(e); });
-              }, 800);
+                  .catch(function(err) { cambiando = false; mostrarError(err); });
+              }, 600);
             });
         }, 800);
       });
   }
 
+  /* ══════════════════════════════════════════
+     CERRAR
+  ══════════════════════════════════════════ */
   function cerrar() {
-    if (scanner) scanner.stop().catch(() => {}).finally(() => window.close());
-    else window.close();
+    if (scanner) {
+      scanner.stop().catch(() => {}).finally(() => window.close());
+    } else {
+      window.close();
+    }
   }
 
   window.addEventListener('load', iniciarScanner);
