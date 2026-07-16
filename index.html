@@ -33,7 +33,8 @@
     .estado-btn.active { border-color: #2196F3; background: #2196F3; color: #fff; }
     .camara-wrap { display: flex; justify-content: flex-end; margin-bottom: 10px; }
     .btn-camara {
-      display: flex; align-items: center; gap: 6px; padding: 7px 14px;
+      display: none; /* oculto por defecto, se muestra solo en móvil */
+      align-items: center; gap: 6px; padding: 7px 14px;
       border: 2px solid #e2e8f0; border-radius: 10px; background: #f8fafc;
       font-size: 13px; font-weight: 600; cursor: pointer; color: #334155;
       transition: .18s; user-select: none;
@@ -96,7 +97,7 @@
   </div>
 
   <div class="camara-wrap">
-    <button class="btn-camara disabled" id="btn-cambiar-camara" onclick="cambiarCamara()">
+    <button class="btn-camara" id="btn-cambiar-camara" onclick="cambiarCamara()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round">
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -122,10 +123,10 @@
   let estadoActual = 'INGRESO';
   let procesando   = false;
   let scanner      = null;
-  let camActual    = 'environment'; // 'environment'=trasera | 'user'=delantera
-  let cambiando    = false;
+  let usandoTrasera = true;  // true = trasera, false = delantera
+  let cambiando     = false;
+  let listaIds      = [];    // IDs reales de cámaras del dispositivo
 
-  // Detectar si es dispositivo móvil/tablet
   const esMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   function setEstado(e) {
@@ -143,9 +144,8 @@
   function registrar(id) {
     if (procesando) return;
     procesando = true;
-    const reader = document.getElementById('qr-reader');
-    reader.classList.add('detectado');
-    setTimeout(() => reader.classList.remove('detectado'), 250);
+    document.getElementById('qr-reader').classList.add('detectado');
+    setTimeout(() => document.getElementById('qr-reader').classList.remove('detectado'), 250);
     mostrar('⏳ Leyendo: ' + id, 'warn', 0);
 
     const cbName = 'cb_' + Date.now();
@@ -171,7 +171,7 @@
   }
 
   function mostrarErrorCamara(msg) {
-    document.getElementById('loading').innerHTML =
+    document.getElementById('qr-reader').innerHTML =
       '<p style="color:#b91c1c;font-size:13px;padding:16px;line-height:1.8;text-align:left">' +
       '❌ <strong>Sin acceso a la cámara</strong><br><br>' +
       '1. Toca el ícono 🔒 junto a la URL<br>' +
@@ -188,48 +188,82 @@
       '<div id="marco-guia"></div>';
   }
 
-  function arrancar(facing) {
-    scanner = new Html5Qrcode('qr-reader');
-    return scanner.start(
-      { facingMode: facing },
-      getCfg(),
-      d => registrar(d.trim()),
-      () => {}
-    );
+  function actualizarBoton() {
+    const txt = document.getElementById('txt-camara');
+    const btn = document.getElementById('btn-cambiar-camara');
+    btn.classList.remove('disabled');
+    txt.textContent = usandoTrasera ? '📷 Cámara delantera' : '📷 Cámara trasera';
   }
 
+  /* ── Arrancar con ID real de cámara ── */
+  function arrancarConId(camaraId) {
+    scanner = new Html5Qrcode('qr-reader');
+    return scanner.start(camaraId, getCfg(), d => registrar(d.trim()), () => {});
+  }
+
+  /* ── Inicio: obtener IDs reales y arrancar trasera ── */
   function iniciarScanner() {
-    const btn = document.getElementById('btn-cambiar-camara');
+    Html5Qrcode.getCameras()
+      .then(function(lista) {
+        if (!lista || lista.length === 0) {
+          mostrarErrorCamara('No se encontraron cámaras.'); return;
+        }
 
-    // En móvil/tablet: mostrar botón siempre (tienen cámara delantera y trasera)
-    // En laptop/PC:    ocultar botón (normalmente solo 1 cámara)
-    if (esMobile) {
-      btn.style.display = 'flex';
-    } else {
-      btn.style.display = 'none';
-    }
+        // Guardar IDs reales
+        listaIds = lista;
 
-    arrancar('environment')
-      .then(function() {
-        camActual = 'environment';
-        document.getElementById('loading').style.display    = 'none';
-        document.getElementById('marco-guia').style.display = 'block';
-        btn.classList.remove('disabled');
-        document.getElementById('txt-camara').textContent = '📷 Cámara delantera';
-      })
-      .catch(function() {
-        // Si no hay trasera (laptop), intentar con delantera
-        arrancar('user')
+        // Mostrar botón solo si hay más de 1 cámara
+        if (esMobile && lista.length > 1) {
+          document.getElementById('btn-cambiar-camara').style.display = 'flex';
+        }
+
+        // Buscar cámara trasera por label
+        let idTrasera = lista[0].id; // default: primera
+        for (let i = 0; i < lista.length; i++) {
+          const lbl = (lista[i].label || '').toLowerCase();
+          if (lbl.includes('back') || lbl.includes('trasera') || lbl.includes('rear')) {
+            idTrasera = lista[i].id; break;
+          }
+        }
+
+        usandoTrasera = true;
+        arrancarConId(idTrasera)
           .then(function() {
-            camActual = 'user';
             document.getElementById('loading').style.display    = 'none';
             document.getElementById('marco-guia').style.display = 'block';
-            btn.style.display = 'none'; // solo 1 cámara disponible
+            actualizarBoton();
           })
-          .catch(mostrarErrorCamara);
+          .catch(function(e) { mostrarErrorCamara(e); });
+      })
+      .catch(function() {
+        // getCameras falló: usar facingMode como fallback
+        // Mostrar botón en móvil aunque no podamos listar cámaras
+        if (esMobile) {
+          document.getElementById('btn-cambiar-camara').style.display = 'flex';
+        }
+        usandoTrasera = true;
+        scanner = new Html5Qrcode('qr-reader');
+        scanner.start('environment', getCfg(), d => registrar(d.trim()), () => {})
+          .then(function() {
+            document.getElementById('loading').style.display    = 'none';
+            document.getElementById('marco-guia').style.display = 'block';
+            actualizarBoton();
+          })
+          .catch(function() {
+            // Último intento con facingMode objeto
+            scanner = new Html5Qrcode('qr-reader');
+            scanner.start({ facingMode: 'environment' }, getCfg(), d => registrar(d.trim()), () => {})
+              .then(function() {
+                document.getElementById('loading').style.display    = 'none';
+                document.getElementById('marco-guia').style.display = 'block';
+                actualizarBoton();
+              })
+              .catch(mostrarErrorCamara);
+          });
       });
   }
 
+  /* ── Cambiar cámara usando IDs reales si están disponibles ── */
   function cambiarCamara() {
     if (!scanner || cambiando) return;
     cambiando = true;
@@ -239,38 +273,84 @@
     btn.classList.add('disabled');
     txt.textContent = 'Cambiando...';
 
-    const nueva = camActual === 'environment' ? 'user' : 'environment';
+    const nuevaEsTrasera = !usandoTrasera;
+
+    // Determinar ID de la cámara destino
+    let idNueva = null;
+    if (listaIds.length > 1) {
+      if (nuevaEsTrasera) {
+        // Buscar trasera
+        for (let i = 0; i < listaIds.length; i++) {
+          const lbl = (listaIds[i].label || '').toLowerCase();
+          if (lbl.includes('back') || lbl.includes('trasera') || lbl.includes('rear')) {
+            idNueva = listaIds[i].id; break;
+          }
+        }
+        if (!idNueva) idNueva = listaIds[0].id;
+      } else {
+        // Buscar delantera
+        for (let i = 0; i < listaIds.length; i++) {
+          const lbl = (listaIds[i].label || '').toLowerCase();
+          if (lbl.includes('front') || lbl.includes('delantera') || lbl.includes('user')) {
+            idNueva = listaIds[i].id; break;
+          }
+        }
+        // Si no encontramos por label, usar la segunda cámara de la lista
+        if (!idNueva) idNueva = listaIds[listaIds.length > 1 ? 1 : 0].id;
+      }
+    }
 
     scanner.stop()
       .catch(() => {})
       .finally(function() {
-        // Pausa 800ms para que Android libere el hardware
         setTimeout(function() {
           resetContainer();
-          arrancar(nueva)
+
+          // Función que intenta arrancar con ID real o facingMode
+          const intentar = function() {
+            if (idNueva) {
+              return arrancarConId(idNueva);
+            } else {
+              // Fallback a facingMode string
+              scanner = new Html5Qrcode('qr-reader');
+              return scanner.start(
+                nuevaEsTrasera ? 'environment' : 'user',
+                getCfg(), d => registrar(d.trim()), () => {}
+              );
+            }
+          };
+
+          intentar()
             .then(function() {
-              camActual = nueva;
+              usandoTrasera = nuevaEsTrasera;
               document.getElementById('loading').style.display    = 'none';
               document.getElementById('marco-guia').style.display = 'block';
-              btn.classList.remove('disabled');
-              txt.textContent = nueva === 'environment'
-                ? '📷 Cámara delantera'
-                : '📷 Cámara trasera';
               cambiando = false;
+              actualizarBoton();
             })
             .catch(function() {
               // Falló: volver a la cámara anterior
               setTimeout(function() {
                 resetContainer();
-                arrancar(camActual)
+                const idAnterior = listaIds.length > 0
+                  ? (usandoTrasera ? listaIds[0].id : (listaIds[1] ? listaIds[1].id : listaIds[0].id))
+                  : null;
+
+                const volver = function() {
+                  if (idAnterior) return arrancarConId(idAnterior);
+                  scanner = new Html5Qrcode('qr-reader');
+                  return scanner.start(
+                    usandoTrasera ? 'environment' : 'user',
+                    getCfg(), d => registrar(d.trim()), () => {}
+                  );
+                };
+
+                volver()
                   .then(function() {
                     document.getElementById('loading').style.display    = 'none';
                     document.getElementById('marco-guia').style.display = 'block';
-                    btn.classList.remove('disabled');
-                    txt.textContent = camActual === 'environment'
-                      ? '📷 Cámara delantera'
-                      : '📷 Cámara trasera';
                     cambiando = false;
+                    actualizarBoton();
                     mostrar('⚠️ Cámara no disponible, volviendo a la anterior', 'warn', 3000);
                   })
                   .catch(function(e) { cambiando = false; mostrarErrorCamara(e); });
