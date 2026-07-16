@@ -13,7 +13,6 @@
   -->
   <script>
     const APP_URL = 'https://script.google.com/macros/s/AKfycbwiN2CZRHF77v6exCmn-oyUDaHknzuazsPCO5AD48I5rE4JfogaElEV_HRzHIWO8z84aA/exec';
-    // Ejemplo: 'https://script.google.com/macros/s/AKfy.../exec'
   </script>
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -41,7 +40,7 @@
     h1 { font-size: 20px; color: #0f172a; margin-bottom: 4px; }
     .sub { font-size: 12px; color: #64748b; margin-bottom: 14px; line-height: 1.5; }
 
-    .estado-wrap { display: flex; gap: 8px; margin-bottom: 14px; }
+    .estado-wrap { display: flex; gap: 8px; margin-bottom: 10px; }
     .estado-btn {
       flex: 1; padding: 10px;
       border: 2px solid #e2e8f0;
@@ -52,6 +51,31 @@
       color: #334155;
     }
     .estado-btn.active { border-color: #2196F3; background: #2196F3; color: #fff; }
+
+    /* ── Botón cambio de cámara ── */
+    .camara-wrap {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 10px;
+    }
+    .btn-camara {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      background: #f8fafc;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #334155;
+      transition: .18s;
+    }
+    .btn-camara:hover { background: #e2e8f0; }
+    .btn-camara:active { transform: scale(.96); }
+    .btn-camara svg { width: 18px; height: 18px; }
+    .btn-camara.cargando { opacity: .5; pointer-events: none; }
 
     #qr-reader {
       width: 100%;
@@ -131,6 +155,17 @@
     <button class="estado-btn"        id="btn-salida"  onclick="setEstado('SALIDA')">SALIDA</button>
   </div>
 
+  <!-- Botón para cambiar entre cámara trasera y delantera -->
+  <div class="camara-wrap">
+    <button class="btn-camara" id="btn-cambiar-camara" onclick="cambiarCamara()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      <span id="txt-camara">Cámara delantera</span>
+    </button>
+  </div>
+
   <div id="qr-reader" style="position:relative">
     <div id="loading">
       <div class="spinner"></div>
@@ -158,9 +193,10 @@
     });
   }
 
-  let estadoActual = 'INGRESO';
-  let procesando   = false;
-  let scanner      = null;
+  let estadoActual  = 'INGRESO';
+  let procesando    = false;
+  let scanner       = null;
+  let camaraActual  = 'environment'; // 'environment' = trasera | 'user' = delantera
 
   function setEstado(e) {
     estadoActual = e;
@@ -221,44 +257,89 @@
     document.head.appendChild(tag);
   }
 
-  function iniciarScanner() {
-    scanner = new Html5Qrcode('qr-reader');
-
-    /* qrbox adaptativo: 58% del ancho disponible */
+  /* ── Configuración del escáner ── */
+  function getCfg() {
     const dim = Math.round(Math.min(window.innerWidth - 80, 380) * 0.58);
-    const cfg = {
+    return {
       fps: 15,
       qrbox: { width: dim, height: dim },
       aspectRatio: 1.0,
       disableFlip: false
     };
+  }
 
-    const onDecode = (decoded) => registrar(decoded.trim());
-    const onError  = () => {};
+  const onDecode = (decoded) => registrar(decoded.trim());
+  const onError  = () => {};
 
-    const arrancado = () => {
-      document.getElementById('loading').style.display    = 'none';
-      document.getElementById('marco-guia').style.display = 'block';
-    };
+  function arrancado() {
+    document.getElementById('loading').style.display    = 'none';
+    document.getElementById('marco-guia').style.display = 'block';
+    // Actualizar texto del botón según cámara activa
+    const btn = document.getElementById('btn-cambiar-camara');
+    const txt = document.getElementById('txt-camara');
+    btn.classList.remove('cargando');
+    txt.textContent = camaraActual === 'environment' ? 'Cámara delantera' : 'Cámara trasera';
+  }
 
-    const mostrarErrorCamara = (err) => {
-      document.getElementById('loading').innerHTML =
-        '<p style="color:#b91c1c;font-size:13px;padding:16px;line-height:1.8;text-align:left">' +
-        '❌ <strong>Sin acceso a la cámara</strong><br><br>' +
-        '1. Haz clic en el ícono 🔒 junto a la URL<br>' +
-        '2. Cambia "Cámara" → <strong>Permitir</strong><br>' +
-        '3. Recarga la página (F5)<br><br>' +
-        '<small style="color:#94a3b8">' + err + '</small>' +
-        '</p>';
-    };
+  function mostrarErrorCamara(err) {
+    document.getElementById('loading').innerHTML =
+      '<p style="color:#b91c1c;font-size:13px;padding:16px;line-height:1.8;text-align:left">' +
+      '❌ <strong>Sin acceso a la cámara</strong><br><br>' +
+      '1. Haz clic en el ícono 🔒 junto a la URL<br>' +
+      '2. Cambia "Cámara" → <strong>Permitir</strong><br>' +
+      '3. Recarga la página (F5)<br><br>' +
+      '<small style="color:#94a3b8">' + err + '</small>' +
+      '</p>';
+  }
 
-    /* Intentar cámara trasera primero (móvil), luego frontal (laptop) */
-    scanner.start({ facingMode: 'environment' }, cfg, onDecode, onError)
-      .then(arrancado)
+  function iniciarScanner() {
+    scanner = new Html5Qrcode('qr-reader');
+
+    // Intentar cámara trasera primero (móvil), luego delantera (laptop)
+    scanner.start({ facingMode: 'environment' }, getCfg(), onDecode, onError)
+      .then(() => { camaraActual = 'environment'; arrancado(); })
       .catch(() => {
-        scanner.start({ facingMode: 'user' }, cfg, onDecode, onError)
+        scanner.start({ facingMode: 'user' }, getCfg(), onDecode, onError)
+          .then(() => { camaraActual = 'user'; arrancado(); })
+          .catch(mostrarErrorCamara);
+      });
+  }
+
+  /* ── Cambiar entre cámara trasera y delantera ── */
+  function cambiarCamara() {
+    if (!scanner) return;
+
+    const btn = document.getElementById('btn-cambiar-camara');
+    const txt = document.getElementById('txt-camara');
+    btn.classList.add('cargando');
+    txt.textContent = 'Cambiando...';
+
+    // Determinar la cámara destino (la opuesta a la actual)
+    const nuevaCamara = camaraActual === 'environment' ? 'user' : 'environment';
+
+    scanner.stop()
+      .then(() => {
+        scanner = new Html5Qrcode('qr-reader');
+        // Mostrar loading mientras cambia
+        document.getElementById('loading').style.display    = 'flex';
+        document.getElementById('marco-guia').style.display = 'none';
+
+        return scanner.start({ facingMode: nuevaCamara }, getCfg(), onDecode, onError);
+      })
+      .then(() => {
+        camaraActual = nuevaCamara;
+        arrancado();
+      })
+      .catch(() => {
+        // Si la cámara destino no está disponible, volver a la anterior
+        scanner = new Html5Qrcode('qr-reader');
+        scanner.start({ facingMode: camaraActual }, getCfg(), onDecode, onError)
           .then(arrancado)
           .catch(mostrarErrorCamara);
+
+        mostrar('⚠️ Esta cámara no está disponible en tu dispositivo', 'warn', 3000);
+        btn.classList.remove('cargando');
+        txt.textContent = camaraActual === 'environment' ? 'Cámara delantera' : 'Cámara trasera';
       });
   }
 
