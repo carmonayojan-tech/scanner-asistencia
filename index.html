@@ -95,16 +95,14 @@
     <button class="estado-btn"        id="btn-salida"  onclick="setEstado('SALIDA')">SALIDA</button>
   </div>
 
-  <!-- Botón cambio de cámara: oculto hasta confirmar que hay más de 1 -->
   <div class="camara-wrap">
-    <button class="btn-camara disabled" id="btn-cambiar-camara"
-            onclick="cambiarCamara()" style="display:none">
+    <button class="btn-camara disabled" id="btn-cambiar-camara" onclick="cambiarCamara()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round">
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
         <circle cx="12" cy="13" r="4"/>
       </svg>
-      <span id="txt-camara">Cámara delantera</span>
+      <span id="txt-camara">📷 Cámara delantera</span>
     </button>
   </div>
 
@@ -124,9 +122,11 @@
   let estadoActual = 'INGRESO';
   let procesando   = false;
   let scanner      = null;
-  let camaras      = [];
-  let idxActual    = 0;
+  let camActual    = 'environment'; // 'environment'=trasera | 'user'=delantera
   let cambiando    = false;
+
+  // Detectar si es dispositivo móvil/tablet
+  const esMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   function setEstado(e) {
     estadoActual = e;
@@ -170,21 +170,6 @@
     return { fps: 12, qrbox: { width: dim, height: dim }, aspectRatio: 1.0, disableFlip: false };
   }
 
-  // Mostrar/actualizar botón SOLO si hay más de 1 cámara
-  function mostrarBoton() {
-    const btn = document.getElementById('btn-cambiar-camara');
-    const txt = document.getElementById('txt-camara');
-    if (camaras.length <= 1) { btn.style.display = 'none'; return; }
-    btn.style.display = 'flex';
-    btn.classList.remove('disabled');
-    // Texto = hacia dónde va a cambiar (la siguiente)
-    const sig = camaras[(idxActual + 1) % camaras.length];
-    const lbl = (sig.label || '').toLowerCase();
-    const esDelantera = lbl.includes('front') || lbl.includes('delantera')
-                     || lbl.includes('user')  || lbl.includes('facing front');
-    txt.textContent = esDelantera ? '📷 Cámara delantera' : '📷 Cámara trasera';
-  }
-
   function mostrarErrorCamara(msg) {
     document.getElementById('loading').innerHTML =
       '<p style="color:#b91c1c;font-size:13px;padding:16px;line-height:1.8;text-align:left">' +
@@ -195,7 +180,6 @@
       '<small style="color:#94a3b8">' + (msg || '') + '</small></p>';
   }
 
-  // Reiniciar el contenedor del escáner
   function resetContainer() {
     document.getElementById('qr-reader').innerHTML =
       '<div id="loading" style="display:flex;flex-direction:column;align-items:center;' +
@@ -204,74 +188,50 @@
       '<div id="marco-guia"></div>';
   }
 
-  // Arrancar con ID de cámara (string) o constraint (objeto facingMode)
-  function arrancar(camId) {
+  function arrancar(facing) {
     scanner = new Html5Qrcode('qr-reader');
-    return scanner.start(camId, getCfg(), d => registrar(d.trim()), () => {});
+    return scanner.start(
+      { facingMode: facing },
+      getCfg(),
+      d => registrar(d.trim()),
+      () => {}
+    );
   }
 
-  // Flujo de inicio: obtener lista real de cámaras
   function iniciarScanner() {
-    Html5Qrcode.getCameras()
-      .then(function(lista) {
-        if (!lista || lista.length === 0) {
-          usarFallback(); return;
-        }
+    const btn = document.getElementById('btn-cambiar-camara');
 
-        // Ordenar: trasera primero (label suele contener "back" o "0")
-        lista.sort(function(a, b) {
-          const aEs = /(back|trasera|rear|0)/i.test(a.label || '');
-          const bEs = /(back|trasera|rear|0)/i.test(b.label || '');
-          return (bEs ? 1 : 0) - (aEs ? 1 : 0);
-        });
+    // En móvil/tablet: mostrar botón siempre (tienen cámara delantera y trasera)
+    // En laptop/PC:    ocultar botón (normalmente solo 1 cámara)
+    if (esMobile) {
+      btn.style.display = 'flex';
+    } else {
+      btn.style.display = 'none';
+    }
 
-        camaras   = lista;
-        idxActual = 0;
-
-        arrancar(camaras[0].id)
-          .then(function() {
-            document.getElementById('loading').style.display    = 'none';
-            document.getElementById('marco-guia').style.display = 'block';
-            mostrarBoton();
-          })
-          .catch(function(e) { mostrarErrorCamara(e); });
-      })
-      .catch(usarFallback);
-  }
-
-  // Fallback cuando getCameras() no funciona en el navegador
-  function usarFallback() {
-    camaras   = [{ id: { facingMode: 'environment' }, label: 'Cámara trasera'   },
-                 { id: { facingMode: 'user' },        label: 'Cámara delantera' }];
-    idxActual = 0;
-    arrancar({ facingMode: 'environment' })
+    arrancar('environment')
       .then(function() {
+        camActual = 'environment';
         document.getElementById('loading').style.display    = 'none';
         document.getElementById('marco-guia').style.display = 'block';
-        // Verificar si realmente existe cámara delantera antes de mostrar botón
-        verificarCamaraDelantera();
-      })
-      .catch(function(e) { mostrarErrorCamara(e); });
-  }
-
-  // Verificar existencia de cámara delantera sin cambiar la actual
-  function verificarCamaraDelantera() {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
-      .then(function(stream) {
-        // Sí existe cámara delantera
-        stream.getTracks().forEach(t => t.stop());
-        mostrarBoton(); // muestra el botón
+        btn.classList.remove('disabled');
+        document.getElementById('txt-camara').textContent = '📷 Cámara delantera';
       })
       .catch(function() {
-        // No hay cámara delantera → ocultar botón
-        camaras = [camaras[0]];
-        document.getElementById('btn-cambiar-camara').style.display = 'none';
+        // Si no hay trasera (laptop), intentar con delantera
+        arrancar('user')
+          .then(function() {
+            camActual = 'user';
+            document.getElementById('loading').style.display    = 'none';
+            document.getElementById('marco-guia').style.display = 'block';
+            btn.style.display = 'none'; // solo 1 cámara disponible
+          })
+          .catch(mostrarErrorCamara);
       });
   }
 
-  // Cambiar entre cámaras
   function cambiarCamara() {
-    if (!scanner || camaras.length <= 1 || cambiando) return;
+    if (!scanner || cambiando) return;
     cambiando = true;
 
     const btn = document.getElementById('btn-cambiar-camara');
@@ -279,33 +239,38 @@
     btn.classList.add('disabled');
     txt.textContent = 'Cambiando...';
 
-    const sigIdx = (idxActual + 1) % camaras.length;
-    const sigCam = camaras[sigIdx];
+    const nueva = camActual === 'environment' ? 'user' : 'environment';
 
     scanner.stop()
       .catch(() => {})
       .finally(function() {
-        // Pausa 800ms para que Android libere el hardware de la cámara
+        // Pausa 800ms para que Android libere el hardware
         setTimeout(function() {
           resetContainer();
-          arrancar(sigCam.id)
+          arrancar(nueva)
             .then(function() {
-              idxActual = sigIdx;
+              camActual = nueva;
               document.getElementById('loading').style.display    = 'none';
               document.getElementById('marco-guia').style.display = 'block';
+              btn.classList.remove('disabled');
+              txt.textContent = nueva === 'environment'
+                ? '📷 Cámara delantera'
+                : '📷 Cámara trasera';
               cambiando = false;
-              mostrarBoton();
             })
             .catch(function() {
-              // Falló: volver a la cámara original con otra pausa
+              // Falló: volver a la cámara anterior
               setTimeout(function() {
                 resetContainer();
-                arrancar(camaras[idxActual].id)
+                arrancar(camActual)
                   .then(function() {
                     document.getElementById('loading').style.display    = 'none';
                     document.getElementById('marco-guia').style.display = 'block';
+                    btn.classList.remove('disabled');
+                    txt.textContent = camActual === 'environment'
+                      ? '📷 Cámara delantera'
+                      : '📷 Cámara trasera';
                     cambiando = false;
-                    mostrarBoton();
                     mostrar('⚠️ Cámara no disponible, volviendo a la anterior', 'warn', 3000);
                   })
                   .catch(function(e) { cambiando = false; mostrarErrorCamara(e); });
