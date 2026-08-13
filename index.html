@@ -97,6 +97,15 @@
       background: #ef4444; transition: .18s;
     }
     .btn-cerrar:hover { background: #dc2626; }
+
+    #badge-cola { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    #btn-sync {
+      flex-shrink: 0; border: 1.5px solid #f59e0b; background: #fff;
+      color: #92400e; font-size: 11px; font-weight: 700;
+      border-radius: 8px; padding: 4px 8px; cursor: pointer;
+    }
+    #btn-sync:active { transform: scale(.95); }
+    #btn-sync:disabled { opacity: .5; }
   </style>
 </head>
 <body>
@@ -240,14 +249,6 @@
   }
 
   function intentarRegistro(id, estado, intento) {
-    // Si el dispositivo ya sabe que no tiene conexión, no tiene sentido
-    // esperar el timeout completo: guardamos de una vez en la cola.
-    if (typeof navigator.onLine === 'boolean' && !navigator.onLine) {
-      encolarPendiente(id, estado);
-      mostrar('📥 Sin conexión.\nGuardado, se enviará automáticamente al volver internet.', 'warn', 4000);
-      return;
-    }
-
     mostrar('⏳ Leyendo: ' + id + (intento > 1 ? ' (reintento ' + intento + '/' + INTENTOS_MAX + ')' : ''), 'warn', 0);
 
     enviarJsonp(id, estado, TIMEOUTS_MS[intento - 1] || 7000)
@@ -295,20 +296,38 @@
       badge.id = 'badge-cola';
       badge.style.cssText = 'font-size:11px;font-weight:600;color:#92400e;background:#fef3c7;'
         + 'border:1.5px solid #fcd34d;border-radius:8px;padding:6px 10px;margin-bottom:10px;display:none;';
+      badge.innerHTML = '<span id="txt-cola"></span><button id="btn-sync" type="button">🔄 Sincronizar ahora</button>';
       document.querySelector('.card').insertBefore(badge, document.getElementById('resultado'));
+      document.getElementById('btn-sync').addEventListener('click', function() {
+        sincronizarManual();
+      });
     }
+    const txt = document.getElementById('txt-cola');
     if (cola.length > 0) {
-      badge.textContent = '📶 ' + cola.length + ' registro(s) pendiente(s) por enviar';
-      badge.style.display = 'block';
+      txt.textContent = '📶 ' + cola.length + ' pendiente(s)'
+        + (ultimoErrorCola ? ' — ' + ultimoErrorCola : '');
+      badge.style.display = 'flex';
     } else {
       badge.style.display = 'none';
     }
   }
+
   let colaEnProceso = false;
-  function procesarCola() {
-    if (colaEnProceso) return;
+  let ultimoErrorCola = '';
+
+  function sincronizarManual() {
+    const btn = document.getElementById('btn-sync');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando...'; }
+    colaEnProceso = false; // por si quedó trabada, forzamos un intento nuevo ya
+    procesarCola(function() {
+      if (btn) { btn.disabled = false; btn.textContent = '🔄 Sincronizar ahora'; }
+    });
+  }
+
+  function procesarCola(onDone) {
+    if (colaEnProceso) { if (onDone) onDone(); return; }
     const cola = leerCola();
-    if (cola.length === 0) return;
+    if (cola.length === 0) { if (onDone) onDone(); return; }
     colaEnProceso = true;
     const item = cola[0];
 
@@ -317,19 +336,30 @@
         const restante = leerCola();
         restante.shift(); // quitar el que ya se envió
         guardarCola(restante);
+        ultimoErrorCola = '';
+        colaEnProceso = false;
         actualizarBadgeCola();
-        colaEnProceso = false;
-        if (restante.length > 0) setTimeout(procesarCola, 500);
+        if (restante.length > 0) procesarCola(onDone);
+        else if (onDone) onDone();
       })
-      .catch(function() {
-        // Sigue sin señal; se reintentará en el próximo ciclo automático.
+      .catch(function(err) {
+        ultimoErrorCola = (err && err.message === 'timeout') ? 'sin respuesta' : 'sin conexión';
         colaEnProceso = false;
+        actualizarBadgeCola();
+        if (onDone) onDone();
       });
   }
-  // Reintenta la cola pendiente cada 15s y también apenas el navegador
-  // detecte que volvió la conexión.
-  setInterval(procesarCola, 15000);
-  window.addEventListener('online', procesarCola);
+
+  // Reintenta la cola pendiente cada 15s...
+  setInterval(function() { procesarCola(); }, 15000);
+  // ...apenas el navegador detecte que volvió la conexión...
+  window.addEventListener('online', function() { procesarCola(); });
+  // ...y apenas la pestaña vuelva a estar activa (clave: si la tablet se
+  // apagó la pantalla o el navegador quedó en segundo plano, los timers
+  // se congelan y esto es lo único que dispara el reintento al reactivarse).
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) procesarCola();
+  });
   window.addEventListener('load', function() { actualizarBadgeCola(); procesarCola(); });
 
   /* ══════════════════════════════════════════
