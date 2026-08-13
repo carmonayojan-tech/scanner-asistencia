@@ -200,31 +200,137 @@
   }
 
   /* ══════════════════════════════════════════
-     REGISTRO JSONP
+     REGISTRO JSONP — con reintentos y cola offline
   ══════════════════════════════════════════ */
+  const INTENTOS_MAX = 3;
+  const TIMEOUTS_MS  = [5000, 6000, 7000]; // timeout de cada intento (crece un poco)
+  const COLA_KEY     = 'colaAsistenciaPendiente';
+
+  // Envía UNA solicitud JSONP y devuelve una Promise.
+  // Se rechaza si no responde a tiempo o si el <script> falla al cargar
+  // (por ejemplo, sin conexión a internet).
+  function enviarJsonp(id, estado, timeoutMs) {
+    return new Promise(function(resolve, reject) {
+      const cbName = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      const tag = document.createElement('script');
+      let timer;
+
+      function limpiar() {
+        clearTimeout(timer);
+        delete window[cbName];
+        tag.remove();
+      }
+
+      window[cbName] = function(data) { limpiar(); resolve(data); };
+      tag.onerror    = function()     { limpiar(); reject(new Error('network')); };
+      timer = setTimeout(function() { limpiar(); reject(new Error('timeout')); }, timeoutMs);
+
+      tag.src = APP_URL + '?page=registrar_jsonp&callback=' + cbName
+        + '&id=' + encodeURIComponent(id) + '&estado=' + encodeURIComponent(estado);
+      document.head.appendChild(tag);
+    });
+  }
+
   function registrar(id) {
     if (procesando) return;
     procesando = true;
     document.getElementById('visor-wrap').classList.add('flash-anim');
     setTimeout(() => document.getElementById('visor-wrap').classList.remove('flash-anim'), 250);
-    mostrar('⏳ Leyendo: ' + id, 'warn', 0);
-
-    const cbName = 'cb_' + Date.now();
-    const tag = document.createElement('script');
-    let timer;
-    window[cbName] = function(data) {
-      clearTimeout(timer); tag.remove(); delete window[cbName];
-      if (data.exito) mostrar('✅ ' + data.estado + ': ' + data.nombre + '\n🕐 ' + data.hora, 'ok', 4000);
-      else            mostrar('⚠️ ' + data.mensaje, 'warn', 4000);
-    };
-    timer = setTimeout(function() {
-      tag.remove(); delete window[cbName];
-      mostrar('❌ Sin respuesta.\n\nVerifica:\n• URL del Web App correcta\n• App publicada ("Cualquier persona")', 'err', 6000);
-    }, 12000);
-    tag.src = APP_URL + '?page=registrar_jsonp&callback=' + cbName
-      + '&id=' + encodeURIComponent(id) + '&estado=' + encodeURIComponent(estadoActual);
-    document.head.appendChild(tag);
+    intentarRegistro(id, estadoActual, 1);
   }
+
+  function intentarRegistro(id, estado, intento) {
+    // Si el dispositivo ya sabe que no tiene conexión, no tiene sentido
+    // esperar el timeout completo: guardamos de una vez en la cola.
+    if (typeof navigator.onLine === 'boolean' && !navigator.onLine) {
+      encolarPendiente(id, estado);
+      mostrar('📥 Sin conexión.\nGuardado, se enviará automáticamente al volver internet.', 'warn', 4000);
+      return;
+    }
+
+    mostrar('⏳ Leyendo: ' + id + (intento > 1 ? ' (reintento ' + intento + '/' + INTENTOS_MAX + ')' : ''), 'warn', 0);
+
+    enviarJsonp(id, estado, TIMEOUTS_MS[intento - 1] || 7000)
+      .then(function(data) {
+        if (data.exito) {
+          mostrar('✅ ' + data.estado + ': ' + data.nombre + '\n🕐 ' + data.hora, 'ok', 4000);
+        } else {
+          // El servidor SÍ respondió, solo que el registro no fue válido
+          // (ej. alumno no encontrado, doble registro). No es un problema
+          // de red, así que no tiene sentido reintentar.
+          mostrar('⚠️ ' + data.mensaje, 'warn', 4000);
+        }
+      })
+      .catch(function() {
+        if (intento < INTENTOS_MAX) {
+          setTimeout(function() { intentarRegistro(id, estado, intento + 1); }, 800);
+        } else {
+          // Se agotaron los reintentos: no perdemos el escaneo del alumno,
+          // se guarda en el dispositivo y se reenvía solo cuando vuelva la señal.
+          encolarPendiente(id, estado);
+          mostrar('📥 Sin señal por ahora.\nGuardado, se enviará automáticamente al volver internet.', 'warn', 5000);
+        }
+      });
+  }
+
+  /* ── Cola offline: guarda en el dispositivo lo que no se pudo enviar ── */
+  function leerCola() {
+    try { return JSON.parse(localStorage.getItem(COLA_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+  function guardarCola(cola) {
+    try { localStorage.setItem(COLA_KEY, JSON.stringify(cola)); } catch (e) {}
+  }
+  function encolarPendiente(id, estado) {
+    const cola = leerCola();
+    cola.push({ id: id, estado: estado, ts: Date.now() });
+    guardarCola(cola);
+    actualizarBadgeCola();
+  }
+  function actualizarBadgeCola() {
+    const cola = leerCola();
+    let badge = document.getElementById('badge-cola');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = 'badge-cola';
+      badge.style.cssText = 'font-size:11px;font-weight:600;color:#92400e;background:#fef3c7;'
+        + 'border:1.5px solid #fcd34d;border-radius:8px;padding:6px 10px;margin-bottom:10px;display:none;';
+      document.querySelector('.card').insertBefore(badge, document.getElementById('resultado'));
+    }
+    if (cola.length > 0) {
+      badge.textContent = '📶 ' + cola.length + ' registro(s) pendiente(s) por enviar';
+      badge.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  let colaEnProceso = false;
+  function procesarCola() {
+    if (colaEnProceso) return;
+    const cola = leerCola();
+    if (cola.length === 0) return;
+    colaEnProceso = true;
+    const item = cola[0];
+
+    enviarJsonp(item.id, item.estado, 6000)
+      .then(function() {
+        const restante = leerCola();
+        restante.shift(); // quitar el que ya se envió
+        guardarCola(restante);
+        actualizarBadgeCola();
+        colaEnProceso = false;
+        if (restante.length > 0) setTimeout(procesarCola, 500);
+      })
+      .catch(function() {
+        // Sigue sin señal; se reintentará en el próximo ciclo automático.
+        colaEnProceso = false;
+      });
+  }
+  // Reintenta la cola pendiente cada 15s y también apenas el navegador
+  // detecte que volvió la conexión.
+  setInterval(procesarCola, 15000);
+  window.addEventListener('online', procesarCola);
+  window.addEventListener('load', function() { actualizarBadgeCola(); procesarCola(); });
 
   /* ══════════════════════════════════════════
      CONFIGURACIÓN ESCÁNER
