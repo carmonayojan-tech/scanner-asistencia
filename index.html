@@ -218,7 +218,11 @@
   // Envía UNA solicitud JSONP y devuelve una Promise.
   // Se rechaza si no responde a tiempo o si el <script> falla al cargar
   // (por ejemplo, sin conexión a internet).
-  function enviarJsonp(id, estado, timeoutMs) {
+  // tsOriginal (opcional): momento real del escaneo, en milisegundos epoch.
+  // Se envía siempre que se conoce, para que si el registro queda pendiente
+  // y se reenvía más tarde, el backend guarde la HORA REAL del escaneo y
+  // no la hora en la que finalmente se logró enviar.
+  function enviarJsonp(id, estado, timeoutMs, tsOriginal) {
     return new Promise(function(resolve, reject) {
       const cbName = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
       const tag = document.createElement('script');
@@ -234,8 +238,10 @@
       tag.onerror    = function()     { limpiar(); reject(new Error('network')); };
       timer = setTimeout(function() { limpiar(); reject(new Error('timeout')); }, timeoutMs);
 
-      tag.src = APP_URL + '?page=registrar_jsonp&callback=' + cbName
+      let src = APP_URL + '?page=registrar_jsonp&callback=' + cbName
         + '&id=' + encodeURIComponent(id) + '&estado=' + encodeURIComponent(estado);
+      if (tsOriginal) src += '&ts=' + encodeURIComponent(tsOriginal);
+      tag.src = src;
       document.head.appendChild(tag);
     });
   }
@@ -245,13 +251,15 @@
     procesando = true;
     document.getElementById('visor-wrap').classList.add('flash-anim');
     setTimeout(() => document.getElementById('visor-wrap').classList.remove('flash-anim'), 250);
-    intentarRegistro(id, estadoActual, 1);
+    // Se captura la hora del escaneo AHORA, no cuando finalmente se logre
+    // enviar (podría ser minutos u horas después si queda pendiente).
+    intentarRegistro(id, estadoActual, 1, Date.now());
   }
 
-  function intentarRegistro(id, estado, intento) {
+  function intentarRegistro(id, estado, intento, tsOriginal) {
     mostrar('⏳ Leyendo: ' + id + (intento > 1 ? ' (reintento ' + intento + '/' + INTENTOS_MAX + ')' : ''), 'warn', 0);
 
-    enviarJsonp(id, estado, TIMEOUTS_MS[intento - 1] || 7000)
+    enviarJsonp(id, estado, TIMEOUTS_MS[intento - 1] || 7000, tsOriginal)
       .then(function(data) {
         if (data.exito) {
           mostrar('✅ ' + data.estado + ': ' + data.nombre + '\n🕐 ' + data.hora, 'ok', 4000);
@@ -264,11 +272,12 @@
       })
       .catch(function() {
         if (intento < INTENTOS_MAX) {
-          setTimeout(function() { intentarRegistro(id, estado, intento + 1); }, 800);
+          setTimeout(function() { intentarRegistro(id, estado, intento + 1, tsOriginal); }, 800);
         } else {
           // Se agotaron los reintentos: no perdemos el escaneo del alumno,
-          // se guarda en el dispositivo y se reenvía solo cuando vuelva la señal.
-          encolarPendiente(id, estado);
+          // se guarda en el dispositivo (con su hora real) y se reenvía
+          // solo cuando vuelva la señal.
+          encolarPendiente(id, estado, tsOriginal);
           mostrar('📥 Sin señal por ahora.\nGuardado, se enviará automáticamente al volver internet.', 'warn', 5000);
         }
       });
@@ -282,9 +291,9 @@
   function guardarCola(cola) {
     try { localStorage.setItem(COLA_KEY, JSON.stringify(cola)); } catch (e) {}
   }
-  function encolarPendiente(id, estado) {
+  function encolarPendiente(id, estado, tsOriginal) {
     const cola = leerCola();
-    cola.push({ id: id, estado: estado, ts: Date.now() });
+    cola.push({ id: id, estado: estado, ts: tsOriginal || Date.now() });
     guardarCola(cola);
     actualizarBadgeCola();
   }
@@ -331,7 +340,7 @@
     colaEnProceso = true;
     const item = cola[0];
 
-    enviarJsonp(item.id, item.estado, 6000)
+    enviarJsonp(item.id, item.estado, 6000, item.ts)
       .then(function() {
         const restante = leerCola();
         restante.shift(); // quitar el que ya se envió
